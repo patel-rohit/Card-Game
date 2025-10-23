@@ -125,3 +125,17 @@ function setCurrentGroup(groupId) {
   state.ui.currentGroupId = groupId;
   saveState(state);
 }
+
+function deleteGame(groupId, gameId) {
+  const state = loadState();
+  const g = state.groups.find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  const idx = g.games.findIndex(x => Number(x.gameId) === Number(gameId));
+  if (idx >= 0) {
+    g.games.splice(idx, 1);
+    // Do NOT decrement nextGameId — keep IDs unique
+    saveState(state);
+    return true;
+  }
+  return false;
+}

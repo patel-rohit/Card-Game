@@ -294,7 +294,7 @@ function renderHistory() {
   const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
   historyContainer.innerHTML = '';
   if (!group) { historyContainer.innerHTML = '<div class="text-muted small">Open a group</div>'; return; }
-  // build table
+
   const table = document.createElement('table');
   table.className = 'table table-sm table-bordered';
   const thead = document.createElement('thead');
@@ -305,6 +305,11 @@ function renderHistory() {
     th.textContent = p.name;
     headerTr.appendChild(th);
   });
+  // Add actions header
+  const thActions = document.createElement('th');
+  thActions.textContent = 'Actions';
+  headerTr.appendChild(thActions);
+
   thead.appendChild(headerTr);
   table.appendChild(thead);
 
@@ -323,12 +328,35 @@ function renderHistory() {
       cell.textContent = (e && e.participated) ? e.points : '';
       tr.appendChild(cell);
     });
+
+    // Actions cell with Delete button
+    const actionsCell = document.createElement('td');
+    actionsCell.innerHTML = `<button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}">Delete</button>`;
+    tr.appendChild(actionsCell);
+
     tbody.appendChild(tr);
   });
 
   table.appendChild(tbody);
   historyContainer.appendChild(table);
+
+  // attach delete events
+  document.querySelectorAll('.btn-delete-game').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      const gid = ev.currentTarget.dataset.gameid;
+      if (!confirm(`Delete game ${gid}? This cannot be undone.`)) return;
+      try {
+        const ok = deleteGame(state.ui.currentGroupId, Number(gid));
+        if (!ok) { alert('Game not found'); return; }
+        refreshState();
+        renderAllForCurrent(); // re-render everything
+      } catch (err) {
+        alert('Failed to delete: ' + (err.message || err));
+      }
+    });
+  });
 }
+
 
 btnExportPDF.addEventListener('click', async () => {
   // export current history table to PDF using jsPDF & autotable
