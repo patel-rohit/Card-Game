@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+  <title>Points Game</title>
+
+  <!-- Bootstrap 5 CSS (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+
+  <style>
+    body { padding-top: 1rem; padding-bottom: 4rem; }
+    .table-responsive-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .small-input { max-width: 110px; }
+    .pointer { cursor: pointer; }
+    .inline-gap > * { margin-right: .5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="d-flex align-items-center justify-content-between mb-3">
+      <h3 class="m-0">Points Game</h3>
+      <div>
+        <button id="btnAddGroup" class="btn btn-primary btn-sm">Add Group</button>
+      </div>
+    </header>
+
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <div class="card">
+          <div class="card-body">
+            <h6>Groups</h6>
+            <div id="groupsList" class="mb-2"></div>
+            <div class="mb-2">
+              <label class="form-label small mb-1">Open group to work on</label>
+              <select id="selCurrentGroup" class="form-select"></select>
+            </div>
+            <div class="d-flex gap-2">
+              <!-- <button id="btnOpenGroup" class="btn btn-outline-secondary btn-sm">Open</button>
+              <button id="btnToggleActiveView" class="btn btn-outline-secondary btn-sm">Toggle Active</button> -->
+              <!-- <button id="btnExportAllJSON" class="btn btn-outline-success btn-sm ms-auto">Export JSON</button> -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-8">
+        <div class="card">
+          <div class="card-body">
+            <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+              <li class="nav-item"><button class="nav-link active" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players">Players</button></li>
+              <li class="nav-item"><button class="nav-link" id="tab-log" data-bs-toggle="tab" data-bs-target="#pane-log">Log Game</button></li>
+              <li class="nav-item"><button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history">History</button></li>
+              <li class="nav-item"><button class="nav-link" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking">Ranking</button></li>
+            </ul>
+
+            <div class="tab-content mt-3">
+              <!-- Players -->
+              <div class="tab-pane fade show active" id="pane-players">
+                <div class="d-flex mb-2">
+                  <input id="inpPersonId" class="form-control form-control-sm me-2" placeholder="Person ID (unique)"/>
+                  <input id="inpPersonName" class="form-control form-control-sm me-2" placeholder="Full Name"/>
+                  <button id="btnAddPerson" class="btn btn-primary btn-sm">Add</button>
+                </div>
+                <div id="playersList" class="list-group"></div>
+              </div>
+
+              <!-- Log Game -->
+              <div class="tab-pane fade" id="pane-log">
+                <div class="d-flex mb-2 align-items-center inline-gap">
+                  <button id="btnCheckAll" class="btn btn-sm btn-outline-secondary">Check all</button>
+                  <button id="btnClearAll" class="btn btn-sm btn-outline-secondary">Clear all</button>
+                  <button id="btnSetZero" class="btn btn-sm btn-outline-secondary">Set all 0</button>
+                  <div class="ms-auto">
+                    <strong>Current Group:</strong> <span id="lblCurrentGroupName"></span>
+                  </div>
+                </div>
+                <form id="formLogGame">
+                  <div id="logPlayersContainer" class="table-responsive-scroll"></div>
+                  <div class="mt-2 d-flex">
+                    <button type="submit" class="btn btn-success btn-sm">Save Game</button>
+                    <div class="ms-auto text-muted small align-self-center">Points range: -1000 to 1000</div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- History -->
+              <div class="tab-pane fade" id="pane-history">
+                <div class="d-flex mb-2">
+                  <div><strong>History (DESC)</strong></div>
+                  <div class="ms-auto inline-gap">
+                    <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">Export PDF</button>
+                    <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear History</button>
+                  </div>
+                </div>
+                <div id="historyContainer" class="table-responsive-scroll"></div>
+              </div>
+
+              <!-- Ranking -->
+              <div class="tab-pane fade" id="pane-ranking">
+                <div class="row">
+                  <div class="col-12 col-md-12">
+                    <h6>Total Points</h6>
+                    <div id="rankTotal" class="table-responsive-scroll"></div>
+                  </div>
+                  <div class="col-12 col-md-6 d-none">
+                    <h6>Average (Participation-aware)</h6>
+                    <div id="rankAvg" class="table-responsive-scroll"></div>
+                  </div>
+                </div>
+              </div>
+
+            </div> <!-- tab-content -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div class="modal fade" id="modalAddGroup" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="formAddGroup" class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Add Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label">Group name</label>
+            <input id="inpGroupName" class="form-control" required maxlength="60"/>
+          </div>
+          <div class="form-check">
+            <input id="chkMarkActive" type="checkbox" class="form-check-input"/>
+            <label class="form-check-label">Mark active</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary btn-sm" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- libraries for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- app scripts -->
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/models.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
