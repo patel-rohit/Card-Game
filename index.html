@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="utf-8" />
+  <meta name="color-scheme" content="light" />
   <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
   <title>Points Game</title>
 
@@ -10,10 +11,10 @@
 
   <style>
     :root { --tile-sel: #198754; --tile-sel-bg: #e9f7ef; }
-    body { background: #f4f6fa; padding-bottom: 5rem; }
-    .app-header { background: linear-gradient(135deg, #2b5876, #4e4376); color: #fff; }
+    body { background: #fff; color: #212529; padding-bottom: 5rem; }
+    .app-header { background: #fff; color: #212529; border-bottom: 1px solid #e9ecef; }
     .app-header .form-select { min-width: 160px; }
-    .card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .card { border: 1px solid #e9ecef; box-shadow: none; }
     .table-responsive-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .nav-tabs .nav-link { font-weight: 500; }
     .nav-tabs .badge { font-size: .7rem; }
@@ -60,11 +61,15 @@
     <div class="container d-flex flex-wrap align-items-center gap-2">
       <h4 class="m-0 me-auto">🃏 Points Game</h4>
       <select id="selCurrentGroup" class="form-select form-select-sm w-auto" aria-label="Current group"></select>
-      <button id="btnAddGroup" class="btn btn-light btn-sm">+ Group</button>
-      <button id="btnDeleteGroup" class="btn btn-outline-light btn-sm" title="Delete current group">Delete</button>
+      <button id="btnAddGroup" class="btn btn-primary btn-sm">+ Group</button>
       <div class="dropdown">
-        <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Backup</button>
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Menu</button>
         <ul class="dropdown-menu dropdown-menu-end">
+          <li><h6 class="dropdown-header">Current group</h6></li>
+          <li><button class="dropdown-item" id="btnRenameGroup">Rename group…</button></li>
+          <li><button class="dropdown-item text-danger" id="btnDeleteGroup">Delete group…</button></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Backup</h6></li>
           <li><button class="dropdown-item" id="btnExportJSON">Download backup (.json)</button></li>
           <li><button class="dropdown-item" id="btnImportJSON">Restore from backup…</button></li>
         </ul>
@@ -95,11 +100,15 @@
               <button type="button" id="btnSetZero" class="btn btn-sm btn-outline-secondary" title="Fill empty points with 0">Fill 0</button>
               <input id="inpLogFilter" type="search" class="form-control form-control-sm ms-auto" style="max-width: 180px" placeholder="Search player…"/>
             </div>
+            <div id="editBanner" class="alert alert-warning py-2 d-flex align-items-center gap-2 d-none">
+              <div>Editing <b id="lblEditGame"></b>. Change players or points, then save.</div>
+              <button type="button" id="btnCancelEdit" class="btn btn-sm btn-outline-dark ms-auto">Cancel edit</button>
+            </div>
             <div class="small text-muted mb-2">Tap a player to include them, then enter their points. Press <kbd>Enter</kbd> to jump to the next player.</div>
             <form id="formLogGame" autocomplete="off">
               <div id="logPlayersContainer"></div>
               <div class="sticky-save d-flex align-items-center gap-2">
-                <button type="submit" class="btn btn-success">Save Game</button>
+                <button type="submit" id="btnSaveGame" class="btn btn-success">Save Game</button>
                 <div id="lblLogSummary" class="small text-muted"></div>
                 <div class="ms-auto text-muted small d-none d-sm-block">Points range: -1000 to 1000</div>
               </div>
@@ -119,6 +128,7 @@
                 <span class="input-group-text">Min games</span>
                 <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
               </div>
+              <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary ms-auto" title="Copy ranking as text (for WhatsApp etc.)">Copy ranking</button>
             </div>
             <div id="rankHint" class="small text-muted mb-2"></div>
             <div id="rankTable" class="table-responsive-scroll"></div>

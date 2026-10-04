@@ -4,6 +4,7 @@
 const selCurrentGroup = document.getElementById('selCurrentGroup');
 const btnAddGroup = document.getElementById('btnAddGroup');
 const btnDeleteGroup = document.getElementById('btnDeleteGroup');
+const btnRenameGroup = document.getElementById('btnRenameGroup');
 const modalAddGroup = new bootstrap.Modal(document.getElementById('modalAddGroup'));
 const formAddGroup = document.getElementById('formAddGroup');
 const inpGroupName = document.getElementById('inpGroupName');
@@ -38,6 +39,10 @@ const btnClearAll = document.getElementById('btnClearAll');
 const btnSetZero = document.getElementById('btnSetZero');
 const inpLogFilter = document.getElementById('inpLogFilter');
 const lblLogSummary = document.getElementById('lblLogSummary');
+const editBanner = document.getElementById('editBanner');
+const lblEditGame = document.getElementById('lblEditGame');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+const btnSaveGame = document.getElementById('btnSaveGame');
 
 const historyContainer = document.getElementById('historyContainer');
 const btnExportPDF = document.getElementById('btnExportPDF');
@@ -47,11 +52,13 @@ const rankTable = document.getElementById('rankTable');
 const rankHint = document.getElementById('rankHint');
 const inpMinGames = document.getElementById('inpMinGames');
 const minGamesWrap = document.getElementById('minGamesWrap');
+const btnCopyRanking = document.getElementById('btnCopyRanking');
 
 let state = loadState();
 
 // In-progress game being logged: survives re-renders (e.g. adding a player mid-way)
-// shape: { groupId, selected: { personId: pointsString } }
+// shape: { groupId, selected: { personId: pointsString }, editingGameId?, before? }
+// While editing a past game, `before` holds the draft that was in progress so it can be restored.
 let logDraft = { groupId: null, selected: {} };
 
 function refreshState() {
@@ -75,11 +82,12 @@ function renderGroups() {
   state.groups.forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.groupId;
-    opt.textContent = `${g.name} (${g.people.length} players · ${g.games.length} games)`;
+    opt.textContent = `${g.name} (${g.people.length} player${g.people.length === 1 ? '' : 's'} · ${g.games.length} game${g.games.length === 1 ? '' : 's'})`;
     selCurrentGroup.appendChild(opt);
   });
   selCurrentGroup.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
   btnDeleteGroup.disabled = !currentGroup();
+  btnRenameGroup.disabled = !currentGroup();
 
   const group = currentGroup();
   badgeGames.textContent = group ? group.games.length : '';
@@ -108,6 +116,20 @@ formAddGroup.addEventListener('submit', (ev) => {
 selCurrentGroup.addEventListener('change', () => {
   const id = selCurrentGroup.value;
   if (id) { setCurrentGroup(id); renderAllForCurrent(); }
+});
+
+btnRenameGroup.addEventListener('click', () => {
+  const group = currentGroup();
+  if (!group) return;
+  const name = prompt('New group name', group.name);
+  if (name === null || name.trim() === group.name) return;
+  try {
+    renameGroup(group.groupId, name);
+    renderAllForCurrent();
+    showToast('Group renamed');
+  } catch (e) {
+    alert(e.message);
+  }
 });
 
 btnDeleteGroup.addEventListener('click', () => {
@@ -297,6 +319,11 @@ function renderLogPlayers() {
   const group = currentGroup();
   ensureDraftForGroup(group);
   logPlayersContainer.innerHTML = '';
+  const editing = logDraft.editingGameId != null;
+  editBanner.classList.toggle('d-none', !editing);
+  lblEditGame.textContent = editing ? `game #${logDraft.editingGameId}` : '';
+  btnSaveGame.textContent = editing ? `Update game #${logDraft.editingGameId}` : 'Save Game';
+  btnSaveGame.className = editing ? 'btn btn-warning' : 'btn btn-success';
   if (!group) { logPlayersContainer.innerHTML = '<div class="text-muted small">Create a group first</div>'; updateLogSummary(); return; }
 
   const stats = computeTotalsAndAverages(group);
@@ -391,7 +418,7 @@ function toggleLogPlayer(id, focusInput) {
 
 function setLogSelection(ids) {
   const prev = logDraft.selected;
-  logDraft.selected = {};
+  logDraft.selected = {};  // keeps editingGameId / before
   ids.forEach(id => { logDraft.selected[id] = prev[id] !== undefined ? prev[id] : ''; });
   renderLogPlayers();
 }
@@ -405,6 +432,29 @@ function updateLogSummary() {
     ? `<b>${n}</b> selected · ${filled.length}/${n} scored · sum <span class="${sum > 0 ? 'text-pos' : sum < 0 ? 'text-neg' : ''}">${sum}</span>`
     : 'No players selected';
 }
+
+function startEditGame(gameId) {
+  const group = currentGroup();
+  const game = group && group.games.find(g => Number(g.gameId) === Number(gameId));
+  if (!game) return;
+  const before = logDraft.editingGameId != null ? logDraft.before : { selected: logDraft.selected };
+  const selected = {};
+  game.entries.forEach(e => {
+    if (e.participated && group.people.some(p => p.personId === e.personId)) selected[e.personId] = String(e.points);
+  });
+  logDraft = { groupId: group.groupId, selected, editingGameId: game.gameId, before };
+  inpLogFilter.value = '';
+  renderLogPlayers();
+  new bootstrap.Tab(document.querySelector('#tab-log')).show();
+}
+
+function stopEditGame() {
+  if (logDraft.editingGameId == null) return;
+  logDraft = { groupId: logDraft.groupId, selected: (logDraft.before && logDraft.before.selected) || {} };
+  renderLogPlayers();
+}
+
+btnCancelEdit.addEventListener('click', () => stopEditGame());
 
 btnCheckAll.addEventListener('click', () => {
   const group = currentGroup();
@@ -455,6 +505,17 @@ formLogGame.addEventListener('submit', (ev) => {
   if (blanks.length && !confirm(`${blanks.length} selected player(s) have no points. Save them as 0?`)) return;
 
   try {
+    if (logDraft.editingGameId != null) {
+      const gameId = logDraft.editingGameId;
+      const original = group.games.find(g => Number(g.gameId) === Number(gameId));
+      // keep entries of players who were removed from the group since this game
+      const extra = original ? original.entries.filter(e => !group.people.some(p => p.personId === e.personId)) : [];
+      updateGame(group.groupId, gameId, rows.concat(extra));
+      stopEditGame();
+      renderAllForCurrent();
+      showToast(`Game ${gameId} updated`);
+      return;
+    }
     addGame(group.groupId, rows);
     // keep the same players selected for the next round, clear the points
     Object.keys(logDraft.selected).forEach(id => { logDraft.selected[id] = ''; });
@@ -508,7 +569,10 @@ function renderHistory() {
       tr.appendChild(cell);
     });
     const actionsCell = document.createElement('td');
-    actionsCell.innerHTML = `<button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}" title="Delete game">✕</button>`;
+    actionsCell.innerHTML = `<div class="d-flex gap-1">
+      <button class="btn btn-sm btn-outline-secondary btn-edit-game" data-gameid="${gm.gameId}" title="Edit game">✎</button>
+      <button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}" title="Delete game">✕</button></div>`;
+    if (gm.editedAt) tr.children[0].title = 'Edited ' + formatLocalDateTimeISO(gm.editedAt);
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);
   });
@@ -528,14 +592,23 @@ function renderHistory() {
 
   historyContainer.appendChild(table);
 
+  historyContainer.querySelectorAll('.btn-edit-game').forEach(btn => {
+    btn.addEventListener('click', ev => startEditGame(Number(ev.currentTarget.dataset.gameid)));
+  });
   historyContainer.querySelectorAll('.btn-delete-game').forEach(btn => {
     btn.addEventListener('click', (ev) => {
       const gid = ev.currentTarget.dataset.gameid;
-      if (!confirm(`Delete game ${gid}? This cannot be undone.`)) return;
+      if (!confirm(`Delete game ${gid}?`)) return;
       try {
-        const ok = deleteGame(state.ui.currentGroupId, Number(gid));
-        if (!ok) { alert('Game not found'); return; }
+        const groupId = state.ui.currentGroupId;
+        const removed = deleteGame(groupId, Number(gid));
+        if (!removed) { alert('Game not found'); return; }
+        if (Number(logDraft.editingGameId) === Number(gid)) stopEditGame();
         renderAllForCurrent();
+        showToast(`Game ${gid} deleted`, {
+          label: 'Undo',
+          onClick: () => { restoreGame(groupId, removed); renderAllForCurrent(); showToast(`Game ${gid} restored`); }
+        });
       } catch (err) {
         alert('Failed to delete: ' + (err.message || err));
       }
@@ -601,6 +674,7 @@ function renderRanking() {
   minGamesWrap.classList.toggle('d-none', mode !== 'average');
 
   rankTable.innerHTML = '';
+  rankingText = '';
   if (!group) { rankTable.innerHTML = '<div class="text-muted small">Create a group first</div>'; rankHint.textContent = ''; return; }
 
   const arr = Object.values(computeTotalsAndAverages(group));
@@ -618,6 +692,7 @@ function renderRanking() {
       (b.total - a.total) || (b.played - a.played) || a.name.localeCompare(b.name));
   }
   const key = mode === 'average' ? (r => r.average.toFixed(2)) : (r => r.total);
+  const lines = [`${group.name} — ranking by ${mode === 'average' ? 'average' : 'total'} (${group.games.length} games)`];
 
   const table = document.createElement('table');
   table.className = 'table table-sm table-bordered rank-table';
@@ -635,7 +710,9 @@ function renderRanking() {
     const k = key(r);
     if (k !== prevKey) { rank = i + 1; prevKey = k; }
     tbody.appendChild(rankRow(r, String(rank), hasStart, mode));
+    lines.push(`${rank}. ${r.name}: ${mode === 'average' ? r.average.toFixed(2) + ' avg' : r.total + ' pts'} (${r.played} game${r.played === 1 ? '' : 's'})`);
   });
+  rankingText = lines.join('\n');
   if (unranked.length) {
     const sep = document.createElement('tr');
     sep.innerHTML = `<td colspan="${hasStart ? 6 : 5}" class="small text-muted bg-light">Not ranked — fewer than ${minGames} game${minGames === 1 ? '' : 's'} played</td>`;
@@ -645,6 +722,18 @@ function renderRanking() {
   table.appendChild(tbody);
   rankTable.appendChild(table);
 }
+
+let rankingText = '';
+
+btnCopyRanking.addEventListener('click', async () => {
+  if (!rankingText) return;
+  try {
+    await navigator.clipboard.writeText(rankingText);
+    showToast('Ranking copied');
+  } catch (e) {
+    prompt('Copy the ranking:', rankingText);
+  }
+});
 
 function rankRow(r, rankLabel, hasStart, mode, muted = false) {
   const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
@@ -697,14 +786,19 @@ function cssEscape(s) {
   return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
 }
 
-function showToast(msg) {
+// action: optional { label, onClick } shown as a button in the toast (e.g. Undo)
+function showToast(msg, action = null) {
+  document.querySelectorAll('.app-toast').forEach(x => x.remove());
   const el = document.createElement('div');
-  el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
+  el.className = 'toast app-toast align-items-center border-0 position-fixed bottom-0 end-0 m-3 ' + (action ? 'text-bg-dark' : 'text-bg-success');
   el.style.zIndex = 1100;
   el.setAttribute('role', 'status');
-  el.innerHTML = `<div class="d-flex"><div class="toast-body">${escapeHtml(msg)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+  el.innerHTML = `<div class="d-flex align-items-center"><div class="toast-body">${escapeHtml(msg)}</div>
+    ${action ? `<button type="button" class="btn btn-sm btn-warning toast-action">${escapeHtml(action.label)}</button>` : ''}
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
   document.body.appendChild(el);
-  const t = new bootstrap.Toast(el, { delay: 2000 });
+  const t = new bootstrap.Toast(el, { delay: action ? 8000 : 2000 });
+  if (action) el.querySelector('.toast-action').addEventListener('click', () => { t.hide(); action.onClick(); });
   el.addEventListener('hidden.bs.toast', () => el.remove());
   t.show();
 }

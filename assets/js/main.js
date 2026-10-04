@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 250);
   }
 
+  // Ask the browser to keep our localStorage even when disk space runs low
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ignore */ }
+
   // Ensure UI is rendered in either case
   // (ui.js already calls renderAllForCurrent() initially; call it here to be safe)
   try { renderAllForCurrent(); } catch (e) { console.warn(e); }

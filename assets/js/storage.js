@@ -82,6 +82,20 @@ function updateGroup(groupId, patch) {
   return g;
 }
 
+function renameGroup(groupId, newName) {
+  const name = String(newName || '').trim();
+  if (!name) throw new Error('Group name cannot be empty');
+  const state = loadState();
+  const g = state.groups.find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  if (state.groups.find(x => x !== g && x.name.trim().toLowerCase() === name.toLowerCase())) {
+    throw new Error('Another group already has this name');
+  }
+  g.name = name;
+  saveState(state);
+  return g;
+}
+
 function deleteGroup(groupId) {
   const state = loadState();
   const idx = state.groups.findIndex(x => x.groupId === groupId);
@@ -165,6 +179,31 @@ function addGame(groupId, entries) {
   return game;
 }
 
+// Replace the entries of an existing game; its id and timestamp are kept.
+function updateGame(groupId, gameId, entries) {
+  const state = loadState();
+  const g = state.groups.find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  const game = g.games.find(x => Number(x.gameId) === Number(gameId));
+  if (!game) throw new Error('Game not found');
+  game.entries = entries;
+  game.editedAt = new Date().toISOString();
+  saveState(state);
+  return game;
+}
+
+// Put back a game removed with deleteGame (used by Undo).
+function restoreGame(groupId, game) {
+  const state = loadState();
+  const g = state.groups.find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  if (g.games.some(x => Number(x.gameId) === Number(game.gameId))) return;
+  g.games.push(game);
+  g.games.sort((a, b) => Number(a.gameId) - Number(b.gameId));
+  if (g.nextGameId <= Number(game.gameId)) g.nextGameId = Number(game.gameId) + 1;
+  saveState(state);
+}
+
 function clearHistory(groupId) {
   const state = loadState();
   const g = state.groups.find(x => x.groupId === groupId);
@@ -187,10 +226,10 @@ function deleteGame(groupId, gameId) {
   if (!g) throw new Error('Group not found');
   const idx = g.games.findIndex(x => Number(x.gameId) === Number(gameId));
   if (idx >= 0) {
-    g.games.splice(idx, 1);
+    const [removed] = g.games.splice(idx, 1);
     // Do NOT decrement nextGameId — keep IDs unique
     saveState(state);
-    return true;
+    return removed; // truthy; lets the UI offer Undo
   }
   return false;
 }
