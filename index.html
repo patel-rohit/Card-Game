@@ -9,110 +9,142 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
 
   <style>
-    body { padding-top: 1rem; padding-bottom: 4rem; }
+    :root { --tile-sel: #198754; --tile-sel-bg: #e9f7ef; }
+    body { background: #f4f6fa; padding-bottom: 5rem; }
+    .app-header { background: linear-gradient(135deg, #2b5876, #4e4376); color: #fff; }
+    .app-header .form-select { min-width: 160px; }
+    .card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .table-responsive-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .small-input { max-width: 110px; }
-    .pointer { cursor: pointer; }
-    .inline-gap > * { margin-right: .5rem; }
+    .nav-tabs .nav-link { font-weight: 500; }
+    .nav-tabs .badge { font-size: .7rem; }
+
+    /* Log game: player tiles */
+    .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+    .player-tile {
+      position: relative; border: 2px solid #dee2e6; border-radius: .75rem; background: #fff;
+      padding: .6rem .7rem; cursor: pointer; user-select: none; transition: all .12s ease;
+      min-height: 70px;
+    }
+    .player-tile:hover { border-color: #adb5bd; }
+    .player-tile:focus-visible { outline: 3px solid rgba(13,110,253,.4); outline-offset: 2px; }
+    .player-tile.selected { border-color: var(--tile-sel); background: var(--tile-sel-bg); }
+    .player-tile .tick {
+      position: absolute; top: .45rem; right: .55rem; width: 1.3rem; height: 1.3rem; border-radius: 50%;
+      border: 2px solid #ced4da; display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; color: #fff;
+    }
+    .player-tile.selected .tick { background: var(--tile-sel); border-color: var(--tile-sel); }
+    .player-tile .pname { font-weight: 600; padding-right: 1.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-tile .pmeta { font-size: .75rem; color: #6c757d; }
+    .player-tile .pts-wrap { display: none; margin-top: .4rem; }
+    .player-tile.selected .pts-wrap { display: flex; }
+    .player-tile.inactive:not(.selected) { opacity: .55; }
+    .player-tile.add-tile { border-style: dashed; color: #6c757d; display: flex; align-items: center; justify-content: center; font-weight: 500; }
+    .player-tile.add-tile:hover { color: #0d6efd; border-color: #0d6efd; }
+    .sticky-save {
+      position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e9ecef;
+      padding: .6rem 0; margin-top: .75rem; z-index: 5;
+    }
+
+    /* ranking */
+    .rank-medal { font-size: 1.1rem; }
+    .rank-table td, .rank-table th { vertical-align: middle; }
+    .rank-table .sorted { background: #fff8e1 !important; font-weight: 600; }
+    .history-table th, .history-table td { white-space: nowrap; }
+    .text-pos { color: #198754; }
+    .text-neg { color: #dc3545; }
   </style>
 </head>
 <body>
+  <header class="app-header py-3 mb-3">
+    <div class="container d-flex flex-wrap align-items-center gap-2">
+      <h4 class="m-0 me-auto">🃏 Points Game</h4>
+      <select id="selCurrentGroup" class="form-select form-select-sm w-auto" aria-label="Current group"></select>
+      <button id="btnAddGroup" class="btn btn-light btn-sm">+ Group</button>
+      <button id="btnDeleteGroup" class="btn btn-outline-light btn-sm" title="Delete current group">Delete</button>
+      <div class="dropdown">
+        <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Backup</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><button class="dropdown-item" id="btnExportJSON">Download backup (.json)</button></li>
+          <li><button class="dropdown-item" id="btnImportJSON">Restore from backup…</button></li>
+        </ul>
+        <input id="fileImportJSON" type="file" accept="application/json,.json" class="d-none"/>
+      </div>
+    </div>
+  </header>
+
   <div class="container">
-    <header class="d-flex align-items-center justify-content-between mb-3">
-      <h3 class="m-0">Points Game</h3>
-      <div>
-        <button id="btnAddGroup" class="btn btn-primary btn-sm">Add Group</button>
-      </div>
-    </header>
+    <div class="card">
+      <div class="card-body">
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+          <li class="nav-item"><button class="nav-link active" id="tab-log" data-bs-toggle="tab" data-bs-target="#pane-log">Log Game</button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking">Ranking</button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history">History <span id="badgeGames" class="badge rounded-pill text-bg-secondary"></span></button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players">Players <span id="badgePlayers" class="badge rounded-pill text-bg-secondary"></span></button></li>
+        </ul>
 
-    <div class="row g-3">
-      <div class="col-12 col-md-4">
-        <div class="card">
-          <div class="card-body">
-            <h6>Groups</h6>
-            <div id="groupsList" class="mb-2"></div>
-            <div class="mb-2">
-              <label class="form-label small mb-1">Open group to work on</label>
-              <select id="selCurrentGroup" class="form-select"></select>
+        <div class="tab-content mt-3">
+          <!-- Log Game -->
+          <div class="tab-pane fade show active" id="pane-log">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <div class="btn-group btn-group-sm" role="group" aria-label="Quick select">
+                <button type="button" id="btnCheckAll" class="btn btn-outline-secondary">All</button>
+                <button type="button" id="btnSelectLast" class="btn btn-outline-secondary" title="Select the players from the previous game">Same as last game</button>
+                <button type="button" id="btnClearAll" class="btn btn-outline-secondary">None</button>
+              </div>
+              <button type="button" id="btnSetZero" class="btn btn-sm btn-outline-secondary" title="Fill empty points with 0">Fill 0</button>
+              <input id="inpLogFilter" type="search" class="form-control form-control-sm ms-auto" style="max-width: 180px" placeholder="Search player…"/>
             </div>
-            <div class="d-flex gap-2">
-              <!-- <button id="btnOpenGroup" class="btn btn-outline-secondary btn-sm">Open</button>
-              <button id="btnToggleActiveView" class="btn btn-outline-secondary btn-sm">Toggle Active</button> -->
-              <!-- <button id="btnExportAllJSON" class="btn btn-outline-success btn-sm ms-auto">Export JSON</button> -->
+            <div class="small text-muted mb-2">Tap a player to include them, then enter their points. Press <kbd>Enter</kbd> to jump to the next player.</div>
+            <form id="formLogGame" autocomplete="off">
+              <div id="logPlayersContainer"></div>
+              <div class="sticky-save d-flex align-items-center gap-2">
+                <button type="submit" class="btn btn-success">Save Game</button>
+                <div id="lblLogSummary" class="small text-muted"></div>
+                <div class="ms-auto text-muted small d-none d-sm-block">Points range: -1000 to 1000</div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Ranking -->
+          <div class="tab-pane fade" id="pane-ranking">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+              <div class="btn-group btn-group-sm" role="group" aria-label="Ranking mode">
+                <input type="radio" class="btn-check" name="rankMode" id="rankModeTotal" value="total" autocomplete="off" checked>
+                <label class="btn btn-outline-primary" for="rankModeTotal">By Total</label>
+                <input type="radio" class="btn-check" name="rankMode" id="rankModeAvg" value="average" autocomplete="off">
+                <label class="btn btn-outline-primary" for="rankModeAvg">By Average</label>
+              </div>
+              <div id="minGamesWrap" class="input-group input-group-sm" style="max-width: 190px">
+                <span class="input-group-text">Min games</span>
+                <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
+              </div>
             </div>
+            <div id="rankHint" class="small text-muted mb-2"></div>
+            <div id="rankTable" class="table-responsive-scroll"></div>
           </div>
-        </div>
-      </div>
 
-      <div class="col-12 col-md-8">
-        <div class="card">
-          <div class="card-body">
-            <ul class="nav nav-tabs" id="mainTabs" role="tablist">
-              <li class="nav-item"><button class="nav-link active" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players">Players</button></li>
-              <li class="nav-item"><button class="nav-link" id="tab-log" data-bs-toggle="tab" data-bs-target="#pane-log">Log Game</button></li>
-              <li class="nav-item"><button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history">History</button></li>
-              <li class="nav-item"><button class="nav-link" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking">Ranking</button></li>
-            </ul>
-
-            <div class="tab-content mt-3">
-              <!-- Players -->
-              <div class="tab-pane fade show active" id="pane-players">
-                <div class="d-flex mb-2">
-                  <input id="inpPersonId" class="form-control form-control-sm me-2" placeholder="Person ID (unique)"/>
-                  <input id="inpPersonName" class="form-control form-control-sm me-2" placeholder="Full Name"/>
-                  <button id="btnAddPerson" class="btn btn-primary btn-sm">Add</button>
-                </div>
-                <div id="playersList" class="list-group"></div>
+          <!-- History -->
+          <div class="tab-pane fade" id="pane-history">
+            <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+              <div><strong>History</strong> <span class="text-muted small">(newest first)</span></div>
+              <div class="ms-auto d-flex gap-2">
+                <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">Export PDF</button>
+                <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear History</button>
               </div>
-
-              <!-- Log Game -->
-              <div class="tab-pane fade" id="pane-log">
-                <div class="d-flex mb-2 align-items-center inline-gap">
-                  <button id="btnCheckAll" class="btn btn-sm btn-outline-secondary">Check all</button>
-                  <button id="btnClearAll" class="btn btn-sm btn-outline-secondary">Clear all</button>
-                  <button id="btnSetZero" class="btn btn-sm btn-outline-secondary">Set all 0</button>
-                  <div class="ms-auto">
-                    <strong>Current Group:</strong> <span id="lblCurrentGroupName"></span>
-                  </div>
-                </div>
-                <form id="formLogGame">
-                  <div id="logPlayersContainer" class="table-responsive-scroll"></div>
-                  <div class="mt-2 d-flex">
-                    <button type="submit" class="btn btn-success btn-sm">Save Game</button>
-                    <div class="ms-auto text-muted small align-self-center">Points range: -1000 to 1000</div>
-                  </div>
-                </form>
-              </div>
-
-              <!-- History -->
-              <div class="tab-pane fade" id="pane-history">
-                <div class="d-flex mb-2">
-                  <div><strong>History (DESC)</strong></div>
-                  <div class="ms-auto inline-gap">
-                    <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">Export PDF</button>
-                    <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear History</button>
-                  </div>
-                </div>
-                <div id="historyContainer" class="table-responsive-scroll"></div>
-              </div>
-
-              <!-- Ranking -->
-              <div class="tab-pane fade" id="pane-ranking">
-                <div class="row">
-                  <div class="col-12 col-md-12">
-                    <h6>Total Points</h6>
-                    <div id="rankTotal" class="table-responsive-scroll"></div>
-                  </div>
-                  <div class="col-12 col-md-6 d-none">
-                    <h6>Average (Participation-aware)</h6>
-                    <div id="rankAvg" class="table-responsive-scroll"></div>
-                  </div>
-                </div>
-              </div>
-
-            </div> <!-- tab-content -->
+            </div>
+            <div id="historyContainer" class="table-responsive-scroll"></div>
           </div>
-        </div>
+
+          <!-- Players -->
+          <div class="tab-pane fade" id="pane-players">
+            <div class="d-flex mb-2 align-items-center">
+              <div class="small text-muted">Uncheck a player to mark them as sitting out (they move to the bottom of Log Game).</div>
+              <button id="btnAddPerson" class="btn btn-primary btn-sm ms-auto">+ Add Player</button>
+            </div>
+            <div id="playersList" class="list-group"></div>
+          </div>
+        </div> <!-- tab-content -->
       </div>
     </div>
   </div>
@@ -129,12 +161,41 @@
           </div>
           <div class="form-check">
             <input id="chkMarkActive" type="checkbox" class="form-check-input"/>
-            <label class="form-check-label">Mark active</label>
+            <label class="form-check-label" for="chkMarkActive">Open this group now</label>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary btn-sm" type="button" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalPerson" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="formPerson" class="modal-content" autocomplete="off">
+        <div class="modal-header"><h5 class="modal-title" id="lblPersonModalTitle">Add Player</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label" for="inpPersonName">Name</label>
+            <input id="inpPersonName" class="form-control" required maxlength="60"/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="inpPersonId">ID <span class="text-muted small">(optional, must be unique)</span></label>
+            <input id="inpPersonId" class="form-control" maxlength="40" placeholder="Auto-generated from name"/>
+          </div>
+          <div id="joinMidway" class="border rounded p-2 bg-light">
+            <div class="fw-semibold mb-1">Joining mid-way? <span id="lblGamesPlayed" class="text-muted small fw-normal"></span></div>
+            <label class="form-label small mb-1" for="inpStartPoints">Starting points</label>
+            <input id="inpStartPoints" type="number" min="-100000" max="100000" step="1" class="form-control form-control-sm mb-2" value="0"/>
+            <div id="startPresets" class="d-flex flex-wrap gap-1 mb-1"></div>
+            <div class="small text-muted">Starting points count toward the <b>Total</b> ranking only. The <b>Average</b> ranking uses just the games this player actually plays, so it stays fair for late joiners.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary btn-sm" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" id="btnPersonSubmit">Add</button>
         </div>
       </form>
     </div>
