@@ -1,96 +1,97 @@
 // ui.js - all UI rendering and interactions
 // depends on storage.js and models.js
 
-const groupsListEl = document.getElementById('groupsList');
 const selCurrentGroup = document.getElementById('selCurrentGroup');
 const btnAddGroup = document.getElementById('btnAddGroup');
+const btnDeleteGroup = document.getElementById('btnDeleteGroup');
 const modalAddGroup = new bootstrap.Modal(document.getElementById('modalAddGroup'));
 const formAddGroup = document.getElementById('formAddGroup');
 const inpGroupName = document.getElementById('inpGroupName');
 const chkMarkActive = document.getElementById('chkMarkActive');
-//const btnOpenGroup = document.getElementById('btnOpenGroup');
-//const btnToggleActiveView = document.getElementById('btnToggleActiveView');
-//const btnExportAllJSON = document.getElementById('btnExportAllJSON');
+const btnExportJSON = document.getElementById('btnExportJSON');
+const btnImportJSON = document.getElementById('btnImportJSON');
+const fileImportJSON = document.getElementById('fileImportJSON');
+
+const badgeGames = document.getElementById('badgeGames');
+const badgePlayers = document.getElementById('badgePlayers');
 
 const playersListEl = document.getElementById('playersList');
-const inpPersonId = document.getElementById('inpPersonId');
-const inpPersonName = document.getElementById('inpPersonName');
 const btnAddPerson = document.getElementById('btnAddPerson');
 
-const lblCurrentGroupName = document.getElementById('lblCurrentGroupName');
+const modalPersonEl = document.getElementById('modalPerson');
+const modalPerson = new bootstrap.Modal(modalPersonEl);
+const formPerson = document.getElementById('formPerson');
+const lblPersonModalTitle = document.getElementById('lblPersonModalTitle');
+const btnPersonSubmit = document.getElementById('btnPersonSubmit');
+const inpPersonId = document.getElementById('inpPersonId');
+const inpPersonName = document.getElementById('inpPersonName');
+const joinMidway = document.getElementById('joinMidway');
+const lblGamesPlayed = document.getElementById('lblGamesPlayed');
+const inpStartPoints = document.getElementById('inpStartPoints');
+const startPresets = document.getElementById('startPresets');
 
 const logPlayersContainer = document.getElementById('logPlayersContainer');
 const formLogGame = document.getElementById('formLogGame');
 const btnCheckAll = document.getElementById('btnCheckAll');
+const btnSelectLast = document.getElementById('btnSelectLast');
 const btnClearAll = document.getElementById('btnClearAll');
 const btnSetZero = document.getElementById('btnSetZero');
+const inpLogFilter = document.getElementById('inpLogFilter');
+const lblLogSummary = document.getElementById('lblLogSummary');
 
 const historyContainer = document.getElementById('historyContainer');
 const btnExportPDF = document.getElementById('btnExportPDF');
 const btnClearHistory = document.getElementById('btnClearHistory');
 
-const rankTotal = document.getElementById('rankTotal');
-const rankAvg = document.getElementById('rankAvg');
+const rankTable = document.getElementById('rankTable');
+const rankHint = document.getElementById('rankHint');
+const inpMinGames = document.getElementById('inpMinGames');
+const minGamesWrap = document.getElementById('minGamesWrap');
 
 let state = loadState();
+
+// In-progress game being logged: survives re-renders (e.g. adding a player mid-way)
+// shape: { groupId, selected: { personId: pointsString } }
+let logDraft = { groupId: null, selected: {} };
 
 function refreshState() {
   state = loadState();
 }
 
-function renderGroups() {
-  refreshState();
-  groupsListEl.innerHTML = '';
-  selCurrentGroup.innerHTML = '';
-  state.groups.forEach(g => {
-    // groups list with active checkbox
-    const div = document.createElement('div');
-    div.className = 'd-flex align-items-center mb-1';
-    div.innerHTML = `
-      <div class="form-check form-switch d-none">
-        <input class="form-check-input chk-active-group " data-id="${g.groupId}" type="checkbox" ${g.isActive ? 'checked' : ''}/>
-      </div>
-      <div class="flex-grow-1 ms-2">${escapeHtml(g.name)}</div>
-      <div><button class="btn btn-sm btn-outline-primary btn-open" data-id="${g.groupId}">Open</button></div>
-    `;
-    groupsListEl.appendChild(div);
-
-    const opt = document.createElement('option');
-    opt.value = g.groupId;
-    opt.textContent = g.name;
-    selCurrentGroup.appendChild(opt);
-  });
-
-  selCurrentGroup.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
-  attachGroupEvents();
+function currentGroup() {
+  return state.groups.find(g => g.groupId === state.ui.currentGroupId) || null;
 }
 
-function attachGroupEvents() {
-  document.querySelectorAll('.chk-active-group').forEach(chk => {
-    chk.addEventListener('change', (ev) => {
-      const id = ev.target.dataset.id;
-      const isActive = ev.target.checked;
-      const g = state.groups.find(x => x.groupId === id);
-      if (g) { updateGroup(id, { isActive }); refreshState(); renderGroups(); }
-    });
+/* Groups */
+function renderGroups() {
+  refreshState();
+  selCurrentGroup.innerHTML = '';
+  if (!state.groups.length) {
+    const opt = document.createElement('option');
+    opt.textContent = 'No groups yet';
+    opt.value = '';
+    selCurrentGroup.appendChild(opt);
+  }
+  state.groups.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.groupId;
+    opt.textContent = `${g.name} (${g.people.length} players · ${g.games.length} games)`;
+    selCurrentGroup.appendChild(opt);
   });
-  document.querySelectorAll('.btn-open').forEach(btn => {
-    btn.addEventListener('click', (ev) => {
-      const id = ev.target.dataset.id;
-      setCurrentGroup(id);
-      refreshState();
-      renderGroups();
-      renderAllForCurrent();
-    });
-  });
+  selCurrentGroup.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
+  btnDeleteGroup.disabled = !currentGroup();
+
+  const group = currentGroup();
+  badgeGames.textContent = group ? group.games.length : '';
+  badgePlayers.textContent = group ? group.people.length : '';
 }
 
 btnAddGroup.addEventListener('click', () => {
   inpGroupName.value = '';
   chkMarkActive.checked = true;
   modalAddGroup.show();
-   setTimeout(() => inpGroupName.focus(), 500); // optional UX improvement
 });
+document.getElementById('modalAddGroup').addEventListener('shown.bs.modal', () => inpGroupName.focus());
 
 formAddGroup.addEventListener('submit', (ev) => {
   ev.preventDefault();
@@ -98,7 +99,6 @@ formAddGroup.addEventListener('submit', (ev) => {
   try {
     createGroup(name, chkMarkActive.checked);
     modalAddGroup.hide();
-    renderGroups();
     renderAllForCurrent();
   } catch (e) {
     alert(e.message);
@@ -107,182 +107,359 @@ formAddGroup.addEventListener('submit', (ev) => {
 
 selCurrentGroup.addEventListener('change', () => {
   const id = selCurrentGroup.value;
-  if (id) { setCurrentGroup(id); renderAllForCurrent(); renderGroups(); }
+  if (id) { setCurrentGroup(id); renderAllForCurrent(); }
 });
 
-// btnToggleActiveView.addEventListener('click', () => {
-//   // simple UX: toggle showing only active groups in selector
-//   const onlyActive = selCurrentGroup.dataset.onlyActive === '1';
-//   selCurrentGroup.dataset.onlyActive = onlyActive ? '0' : '1';
-//   // rebuild options
-//   selCurrentGroup.innerHTML = '';
-//   const filtered = !onlyActive ? state.groups.filter(g => g.isActive) : state.groups;
-//   filtered.forEach(g => {
-//     const opt = document.createElement('option');
-//     opt.value = g.groupId;
-//     opt.textContent = g.name;
-//     selCurrentGroup.appendChild(opt);
-//   });
-// });
+btnDeleteGroup.addEventListener('click', () => {
+  const group = currentGroup();
+  if (!group) return;
+  const typed = prompt(`This permanently deletes "${group.name}" with all its players and ${group.games.length} games.\nTip: download a backup first.\n\nType the group name to confirm:`);
+  if (typed === null) return;
+  if (typed.trim() !== group.name) { alert('Name did not match. Nothing was deleted.'); return; }
+  deleteGroup(group.groupId);
+  renderAllForCurrent();
+});
 
-// btnExportAllJSON.addEventListener('click', () => {
-//   const data = JSON.stringify(loadState(), null, 2);
-//   downloadTextFile('points_game_export.json', data);
-// });
+/* Backup */
+btnExportJSON.addEventListener('click', () => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadTextFile(`points_game_backup_${stamp}.json`, exportStateJSON());
+});
+
+btnImportJSON.addEventListener('click', () => { fileImportJSON.value = ''; fileImportJSON.click(); });
+
+fileImportJSON.addEventListener('change', async () => {
+  const file = fileImportJSON.files[0];
+  if (!file) return;
+  if (!confirm('Restoring replaces ALL current groups with the backup file. Continue?')) return;
+  try {
+    importStateJSON(await file.text());
+    logDraft = { groupId: null, selected: {} };
+    renderAllForCurrent();
+    alert('Backup restored.');
+  } catch (e) {
+    alert('Could not restore backup: ' + e.message);
+  }
+});
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
 
 /* Players UI */
 function renderPlayersList() {
-  refreshState();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
+  const group = currentGroup();
   playersListEl.innerHTML = '';
-  if (!group) { playersListEl.innerHTML = '<div class="text-muted small">No group opened</div>'; return; }
+  if (!group) { playersListEl.innerHTML = '<div class="text-muted small">Create a group first</div>'; return; }
+  if (!group.people.length) { playersListEl.innerHTML = '<div class="text-muted small p-2">No players yet. Click “+ Add Player”.</div>'; return; }
+
+  const stats = computeTotalsAndAverages(group);
   group.people.forEach(p => {
+    const st = stats[p.personId];
+    const lateJoin = (Number(p.joinedAfterGameId) || 0) > 0;
     const item = document.createElement('div');
-    item.className = 'list-group-item d-flex align-items-center';
+    item.className = 'list-group-item d-flex align-items-center gap-2';
     item.innerHTML = `
-      <div class="form-check me-2">
-        <input class="form-check-input chk-person-enabled" data-id="${p.personId}" type="checkbox" ${p.enabled ? 'checked' : ''}/>
+      <div class="form-check form-switch m-0" title="Active (uncheck if sitting out)">
+        <input class="form-check-input chk-person-enabled" data-id="${escapeHtml(p.personId)}" type="checkbox" ${p.enabled ? 'checked' : ''}/>
       </div>
       <div class="flex-grow-1">
         <strong>${escapeHtml(p.name)}</strong> <small class="text-muted">(${escapeHtml(p.personId)})</small>
+        <div class="small text-muted">
+          ${st.played} games · total ${st.total}
+          ${st.start ? ` · started with ${st.start}` : ''}
+          ${lateJoin ? ` · joined after game ${p.joinedAfterGameId}` : ''}
+        </div>
       </div>
-      <div>
-        <button class="btn btn-sm btn-outline-secondary btn-edit" data-id="${p.personId}">Edit</button>
-        <button class="btn btn-sm btn-outline-danger btn-remove" data-id="${p.personId}">Remove</button>
+      <div class="d-flex gap-1">
+        <button class="btn btn-sm btn-outline-secondary btn-edit" data-id="${escapeHtml(p.personId)}">Edit</button>
+        <button class="btn btn-sm btn-outline-danger btn-remove" data-id="${escapeHtml(p.personId)}">Remove</button>
       </div>
     `;
     playersListEl.appendChild(item);
   });
 
-  // events
-  document.querySelectorAll('.chk-person-enabled').forEach(chk => {
+  playersListEl.querySelectorAll('.chk-person-enabled').forEach(chk => {
     chk.addEventListener('change', ev => {
-      const pid = ev.target.dataset.id;
-      updatePerson(state.ui.currentGroupId, pid, { enabled: ev.target.checked });
-      refreshState(); renderAllForCurrent();
-    });
-  });
-  document.querySelectorAll('.btn-remove').forEach(btn => {
-    btn.addEventListener('click', ev => {
-      if (!confirm('Remove person? (history remains)')) return;
-      removePerson(state.ui.currentGroupId, ev.target.dataset.id);
-      refreshState(); renderAllForCurrent();
-    });
-  });
-  document.querySelectorAll('.btn-edit').forEach(btn => {
-    btn.addEventListener('click', ev => {
-      const pid = ev.target.dataset.id;
-      const g = state.groups.find(x => x.groupId === state.ui.currentGroupId);
-      const p = g.people.find(x => x.personId === pid);
-      const newName = prompt('New name', p.name);
-      if (newName === null) return;
-      const newId = prompt('Change ID (leave blank to keep)', p.personId) || p.personId;
-      // basic uniqueness check for id
-      if (newId.trim().toLowerCase() !== p.personId.trim().toLowerCase() && g.people.find(x=>x.personId.trim().toLowerCase()===newId.trim().toLowerCase())) {
-        alert('Duplicate ID in this group');
-        return;
-      }
-      // update (if id changed, remove old and add new)
-      if (newId !== p.personId) {
-        updatePerson(state.ui.currentGroupId, p.personId, { personId: newId, name: newName });
-        // NOTE: simple approach: mutate id directly (we stored by object reference)
-      } else {
-        updatePerson(state.ui.currentGroupId, p.personId, { name: newName });
-      }
-      refreshState();
+      updatePerson(state.ui.currentGroupId, ev.target.dataset.id, { enabled: ev.target.checked });
       renderAllForCurrent();
     });
   });
+  playersListEl.querySelectorAll('.btn-remove').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      if (!confirm('Remove player? (their history remains)')) return;
+      removePerson(state.ui.currentGroupId, ev.currentTarget.dataset.id);
+      renderAllForCurrent();
+    });
+  });
+  playersListEl.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', ev => openPersonModal(ev.currentTarget.dataset.id));
+  });
 }
 
-btnAddPerson.addEventListener('click', () => {
-  const pid = inpPersonId.value.trim();
+/* Add / edit player modal (supports joining mid-way) */
+let personModalEditId = null;
+
+function openPersonModal(editId = null) {
+  const group = currentGroup();
+  if (!group) { alert('Create a group first'); return; }
+  personModalEditId = editId;
+  const p = editId ? group.people.find(x => x.personId === editId) : null;
+
+  lblPersonModalTitle.textContent = p ? 'Edit Player' : 'Add Player';
+  btnPersonSubmit.textContent = p ? 'Save' : 'Add';
+  inpPersonName.value = p ? p.name : '';
+  inpPersonId.value = p ? p.personId : '';
+  inpStartPoints.value = p ? (Number(p.startPoints) || 0) : 0;
+
+  // Mid-way join section: only relevant once games exist (or when editing a late joiner)
+  const gamesCount = group.games.length;
+  const showJoin = gamesCount > 0 || (p && Number(p.startPoints));
+  joinMidway.classList.toggle('d-none', !showJoin);
+  lblGamesPlayed.textContent = gamesCount ? `(${gamesCount} game${gamesCount === 1 ? '' : 's'} already played)` : '';
+
+  // Presets based on current totals of players who have played (excluding the one being edited)
+  startPresets.innerHTML = '';
+  const others = Object.values(computeTotalsAndAverages(group))
+    .filter(x => x.played > 0 && x.personId !== editId && group.people.some(pp => pp.personId === x.personId));
+  if (others.length) {
+    const totals = others.map(x => x.total);
+    const presets = [
+      ['Start at 0', 0],
+      ['Average total', Math.round(totals.reduce((a, b) => a + b, 0) / totals.length)],
+      ['Lowest total', Math.min(...totals)],
+      ['Highest total', Math.max(...totals)]
+    ];
+    presets.forEach(([label, val]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-sm btn-outline-secondary';
+      b.textContent = `${label} (${val})`;
+      b.addEventListener('click', () => { inpStartPoints.value = val; });
+      startPresets.appendChild(b);
+    });
+  }
+
+  modalPerson.show();
+}
+
+modalPersonEl.addEventListener('shown.bs.modal', () => inpPersonName.focus());
+
+btnAddPerson.addEventListener('click', () => openPersonModal());
+
+formPerson.addEventListener('submit', (ev) => {
+  ev.preventDefault();
   const name = inpPersonName.value.trim();
-  if (!pid || !name) { alert('Provide ID and name'); return; }
+  const pid = inpPersonId.value.trim();
+  const startPoints = Number(inpStartPoints.value || 0);
+  if (!name) { alert('Provide a name'); return; }
+  if (!Number.isFinite(startPoints) || !Number.isInteger(startPoints)) { alert('Starting points must be a whole number'); return; }
   try {
-    addPerson(state.ui.currentGroupId, pid, name);
-    inpPersonId.value = ''; inpPersonName.value = '';
-    refreshState(); renderAllForCurrent();
+    if (personModalEditId) {
+      updatePerson(state.ui.currentGroupId, personModalEditId, { name, personId: pid || personModalEditId, startPoints });
+      // keep an in-progress selection linked if the ID changed
+      if (pid && pid !== personModalEditId && personModalEditId in logDraft.selected) {
+        logDraft.selected[pid] = logDraft.selected[personModalEditId];
+        delete logDraft.selected[personModalEditId];
+      }
+    } else {
+      const person = addPerson(state.ui.currentGroupId, pid, name, { startPoints });
+      // a player added while logging a game is selected straight away
+      if (logDraft.groupId === state.ui.currentGroupId) logDraft.selected[person.personId] = '';
+    }
+    modalPerson.hide();
+    renderAllForCurrent();
   } catch (e) {
     alert(e.message);
   }
 });
 
 /* Log Game UI */
-function renderLogPlayers() {
-  refreshState();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
-  logPlayersContainer.innerHTML = '';
-  lblCurrentGroupName.textContent = group ? group.name : '(no group)';
-  if (!group) { logPlayersContainer.innerHTML = '<div class="text-muted small">Open a group first</div>'; return; }
-
-  // Only show enabled players
-  const players = group.people.slice();
-  if (!players.length) { logPlayersContainer.innerHTML = '<div class="text-muted small">No players in this group</div>'; return; }
-
-  const table = document.createElement('table');
-  table.className = 'table table-sm table-bordered';
-  const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>Play</th><th>ID</th><th>Name</th><th>Points</th></tr>';
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
-
-  players.forEach(p => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td class="align-middle text-center"><input type="checkbox" class="form-check-input chk-part" data-id="${p.personId}"></td>
-      <td class="align-middle">${escapeHtml(p.personId)}</td>
-      <td class="align-middle">${escapeHtml(p.name)}</td>
-      <td class="align-middle"><input type="number" min="-1000" max="1000" class="form-control form-control-sm small-input inp-pts" data-id="${p.personId}" disabled></td>
-    `;
-    tbody.appendChild(row);
-  });
-
-  table.appendChild(tbody);
-  logPlayersContainer.appendChild(table);
-
-  // events
-  document.querySelectorAll('.chk-part').forEach(chk => {
-    chk.addEventListener('change', ev => {
-      const id = ev.target.dataset.id;
-      const input = document.querySelector(`.inp-pts[data-id="${id}"]`);
-      input.disabled = !ev.target.checked;
-      if (!ev.target.checked) input.value = '';
+function ensureDraftForGroup(group) {
+  if (logDraft.groupId !== (group && group.groupId)) {
+    logDraft = { groupId: group ? group.groupId : null, selected: {} };
+  }
+  // drop selections for players that no longer exist
+  if (group) {
+    Object.keys(logDraft.selected).forEach(id => {
+      if (!group.people.some(p => p.personId === id)) delete logDraft.selected[id];
     });
-  });
+  }
 }
 
-btnCheckAll.addEventListener('click', () => { document.querySelectorAll('.chk-part').forEach(c=>{ c.checked=true; c.dispatchEvent(new Event('change'))}); });
-btnClearAll.addEventListener('click', () => { document.querySelectorAll('.chk-part').forEach(c=>{ c.checked=false; c.dispatchEvent(new Event('change'))}); });
-btnSetZero.addEventListener('click', () => { document.querySelectorAll('.chk-part').forEach(_=>{ /* set 0 when checked */ }); document.querySelectorAll('.chk-part').forEach(c=>{ if (c.checked) { const input = document.querySelector(`.inp-pts[data-id="${c.dataset.id}"]`); input.value = '0';}}); });
+function renderLogPlayers() {
+  const group = currentGroup();
+  ensureDraftForGroup(group);
+  logPlayersContainer.innerHTML = '';
+  if (!group) { logPlayersContainer.innerHTML = '<div class="text-muted small">Create a group first</div>'; updateLogSummary(); return; }
+
+  const stats = computeTotalsAndAverages(group);
+  // active players first, then those sitting out
+  const players = group.people.slice().sort((a, b) => (b.enabled !== false) - (a.enabled !== false));
+  const filter = inpLogFilter.value.trim().toLowerCase();
+
+  const grid = document.createElement('div');
+  grid.className = 'player-grid';
+
+  players.forEach(p => {
+    if (filter && !p.name.toLowerCase().includes(filter) && !p.personId.toLowerCase().includes(filter) && !(p.personId in logDraft.selected)) return;
+    const selected = p.personId in logDraft.selected;
+    const st = stats[p.personId];
+    const tile = document.createElement('div');
+    tile.className = 'player-tile' + (selected ? ' selected' : '') + (p.enabled === false ? ' inactive' : '');
+    tile.tabIndex = 0;
+    tile.dataset.id = p.personId;
+    tile.setAttribute('role', 'checkbox');
+    tile.setAttribute('aria-checked', selected ? 'true' : 'false');
+    tile.innerHTML = `
+      <span class="tick">✓</span>
+      <div class="pname" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+      <div class="pmeta">Total ${st.total} · ${st.played} games${p.enabled === false ? ' · sitting out' : ''}</div>
+      <div class="pts-wrap input-group input-group-sm">
+        <button type="button" class="btn btn-outline-secondary btn-sign" title="Flip sign (+/−)">±</button>
+        <input type="number" min="-1000" max="1000" step="1" class="form-control inp-pts" placeholder="Points"
+               data-id="${escapeHtml(p.personId)}" value="${selected ? escapeHtml(logDraft.selected[p.personId]) : ''}">
+      </div>
+    `;
+    grid.appendChild(tile);
+  });
+
+  const addTile = document.createElement('div');
+  addTile.className = 'player-tile add-tile';
+  addTile.tabIndex = 0;
+  addTile.textContent = group.games.length ? '+ Player joins mid-game' : '+ Add player';
+  addTile.addEventListener('click', () => openPersonModal());
+  addTile.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openPersonModal(); } });
+  grid.appendChild(addTile);
+
+  logPlayersContainer.appendChild(grid);
+
+  grid.querySelectorAll('.player-tile:not(.add-tile)').forEach(tile => {
+    const id = tile.dataset.id;
+    const input = tile.querySelector('.inp-pts');
+    tile.addEventListener('click', ev => {
+      if (ev.target.closest('.pts-wrap')) return; // clicks in the points box don't toggle
+      toggleLogPlayer(id, true);
+    });
+    tile.addEventListener('keydown', ev => {
+      if (ev.target !== tile) return;
+      if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); toggleLogPlayer(id, true); }
+    });
+    input.addEventListener('input', () => { logDraft.selected[id] = input.value; updateLogSummary(); });
+    input.addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      // move to the next selected player's points; submit after the last one
+      const inputs = Array.from(logPlayersContainer.querySelectorAll('.player-tile.selected .inp-pts'));
+      const next = inputs[inputs.indexOf(input) + 1];
+      if (next) { next.focus(); next.select(); } else formLogGame.requestSubmit();
+    });
+    tile.querySelector('.btn-sign').addEventListener('click', () => {
+      const v = input.value.trim();
+      input.value = v.startsWith('-') ? v.slice(1) : (v ? '-' + v : '-');
+      logDraft.selected[id] = input.value;
+      input.focus();
+      updateLogSummary();
+    });
+  });
+
+  updateLogSummary();
+}
+
+function toggleLogPlayer(id, focusInput) {
+  const tile = logPlayersContainer.querySelector(`.player-tile[data-id="${cssEscape(id)}"]`);
+  const input = tile && tile.querySelector('.inp-pts');
+  if (id in logDraft.selected) {
+    delete logDraft.selected[id];
+    if (tile) { tile.classList.remove('selected'); tile.setAttribute('aria-checked', 'false'); input.value = ''; }
+  } else {
+    logDraft.selected[id] = '';
+    if (tile) {
+      tile.classList.add('selected');
+      tile.setAttribute('aria-checked', 'true');
+      if (focusInput) input.focus();
+    }
+  }
+  updateLogSummary();
+}
+
+function setLogSelection(ids) {
+  const prev = logDraft.selected;
+  logDraft.selected = {};
+  ids.forEach(id => { logDraft.selected[id] = prev[id] !== undefined ? prev[id] : ''; });
+  renderLogPlayers();
+}
+
+function updateLogSummary() {
+  const vals = Object.values(logDraft.selected);
+  const n = vals.length;
+  const filled = vals.filter(v => String(v).trim() !== '' && String(v).trim() !== '-');
+  const sum = filled.reduce((a, v) => a + (Number(v) || 0), 0);
+  lblLogSummary.innerHTML = n
+    ? `<b>${n}</b> selected · ${filled.length}/${n} scored · sum <span class="${sum > 0 ? 'text-pos' : sum < 0 ? 'text-neg' : ''}">${sum}</span>`
+    : 'No players selected';
+}
+
+btnCheckAll.addEventListener('click', () => {
+  const group = currentGroup();
+  if (group) setLogSelection(group.people.filter(p => p.enabled !== false).map(p => p.personId));
+});
+btnClearAll.addEventListener('click', () => setLogSelection([]));
+btnSelectLast.addEventListener('click', () => {
+  const group = currentGroup();
+  if (!group || !group.games.length) { alert('No previous game in this group'); return; }
+  const last = group.games.reduce((a, b) => (Number(b.gameId) > Number(a.gameId) ? b : a));
+  const ids = last.entries.filter(e => e.participated && group.people.some(p => p.personId === e.personId)).map(e => e.personId);
+  setLogSelection(ids);
+});
+btnSetZero.addEventListener('click', () => {
+  Object.keys(logDraft.selected).forEach(id => {
+    const v = String(logDraft.selected[id]).trim();
+    if (v === '' || v === '-') logDraft.selected[id] = '0';
+  });
+  renderLogPlayers();
+});
+inpLogFilter.addEventListener('input', () => renderLogPlayers());
 
 formLogGame.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
-  if (!group) { alert('Open a group'); return; }
+  const group = currentGroup();
+  if (!group) { alert('Create a group first'); return; }
+  const ids = Object.keys(logDraft.selected);
+  if (!ids.length) { alert('Select at least one player'); return; }
+
   const rows = [];
-  document.querySelectorAll('.chk-part').forEach(chk => {
-    const id = chk.dataset.id;
-    const participated = chk.checked;
-    const ptsInput = document.querySelector(`.inp-pts[data-id="${id}"]`);
-    const points = participated ? Number(ptsInput.value || 0) : null;
+  for (const p of group.people) {
+    const participated = p.personId in logDraft.selected;
+    let points = null;
     if (participated) {
+      const raw = String(logDraft.selected[p.personId]).trim();
+      points = raw === '' ? 0 : Number(raw);
       if (!Number.isInteger(points) || points < -1000 || points > 1000) {
-        throwAlert(`Points for ${id} must be integer between -1000 and 1000`);
-        throw 'validation';
+        alert(`Points for ${p.name} must be a whole number between -1000 and 1000`);
+        const input = logPlayersContainer.querySelector(`.inp-pts[data-id="${cssEscape(p.personId)}"]`);
+        if (input) input.focus();
+        return;
       }
     }
-    rows.push({ personId: id, participated, points });
-  });
+    rows.push({ personId: p.personId, participated, points });
+  }
 
-  if (!rows.some(r => r.participated)) { alert('At least one participant'); return; }
+  const blanks = ids.filter(id => String(logDraft.selected[id]).trim() === '');
+  if (blanks.length && !confirm(`${blanks.length} selected player(s) have no points. Save them as 0?`)) return;
+
   try {
     addGame(group.groupId, rows);
-    refreshState();
+    // keep the same players selected for the next round, clear the points
+    Object.keys(logDraft.selected).forEach(id => { logDraft.selected[id] = ''; });
     renderAllForCurrent();
-    // switch to history tab
-    const historyTab = new bootstrap.Tab(document.querySelector('#tab-history'));
-    historyTab.show();
+    showToast(`Game ${group.nextGameId} saved`);
   } catch (e) {
     alert('Failed to save game: ' + e.message);
   }
@@ -290,66 +467,75 @@ formLogGame.addEventListener('submit', (ev) => {
 
 /* History UI */
 function renderHistory() {
-  refreshState();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
+  const group = currentGroup();
   historyContainer.innerHTML = '';
-  if (!group) { historyContainer.innerHTML = '<div class="text-muted small">Open a group</div>'; return; }
+  if (!group) { historyContainer.innerHTML = '<div class="text-muted small">Create a group first</div>'; return; }
+  if (!group.games.length) { historyContainer.innerHTML = '<div class="text-muted small">No games yet</div>'; return; }
+
+  const stats = computeTotalsAndAverages(group);
+  const hasStart = group.people.some(p => Number(p.startPoints));
 
   const table = document.createElement('table');
-  table.className = 'table table-sm table-bordered';
+  table.className = 'table table-sm table-bordered table-hover history-table';
   const thead = document.createElement('thead');
   const headerTr = document.createElement('tr');
-  headerTr.innerHTML = '<th>Game Id</th><th>Date & Time</th>';
+  headerTr.innerHTML = '<th>#</th><th>Date & Time</th>';
   group.people.forEach(p => {
     const th = document.createElement('th');
     th.textContent = p.name;
     headerTr.appendChild(th);
   });
-  // Add actions header
-  const thActions = document.createElement('th');
-  thActions.textContent = 'Actions';
-  headerTr.appendChild(thActions);
-
+  headerTr.insertAdjacentHTML('beforeend', '<th></th>');
   thead.appendChild(headerTr);
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  // sort desc by timestamp (or gameId)
-  const games = group.games.slice().sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+  const games = group.games.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   games.forEach(gm => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${gm.gameId}</td><td>${formatLocalDateTimeISO(gm.timestamp)}</td>`;
-    // make a map for quick lookup
+    tr.innerHTML = `<td>${gm.gameId}</td><td class="small">${formatLocalDateTimeISO(gm.timestamp)}</td>`;
     const mp = {};
     gm.entries.forEach(e => mp[e.personId] = e);
     group.people.forEach(p => {
       const cell = document.createElement('td');
       const e = mp[p.personId];
-      cell.textContent = (e && e.participated) ? e.points : '';
+      if (e && e.participated) {
+        cell.textContent = e.points;
+        cell.className = e.points > 0 ? 'text-pos' : e.points < 0 ? 'text-neg' : '';
+      } else if (Number(gm.gameId) <= (Number(p.joinedAfterGameId) || 0) && !e) {
+        cell.innerHTML = '<span class="text-muted small" title="Not joined yet">–</span>';
+      }
       tr.appendChild(cell);
     });
-
-    // Actions cell with Delete button
     const actionsCell = document.createElement('td');
-    actionsCell.innerHTML = `<button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}">Delete</button>`;
+    actionsCell.innerHTML = `<button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}" title="Delete game">✕</button>`;
     tr.appendChild(actionsCell);
-
     tbody.appendChild(tr);
   });
-
   table.appendChild(tbody);
+
+  const tfoot = document.createElement('tfoot');
+  const footRow = (label, fn) => {
+    const tr = document.createElement('tr');
+    tr.className = 'table-light fw-semibold';
+    tr.innerHTML = `<td colspan="2">${label}</td>` + group.people.map(p => `<td>${fn(stats[p.personId])}</td>`).join('') + '<td></td>';
+    tfoot.appendChild(tr);
+  };
+  if (hasStart) footRow('Starting points', s => s.start || '');
+  footRow('Total', s => s.total);
+  footRow('Average', s => (s.played ? s.average.toFixed(2) : ''));
+  table.appendChild(tfoot);
+
   historyContainer.appendChild(table);
 
-  // attach delete events
-  document.querySelectorAll('.btn-delete-game').forEach(btn => {
+  historyContainer.querySelectorAll('.btn-delete-game').forEach(btn => {
     btn.addEventListener('click', (ev) => {
       const gid = ev.currentTarget.dataset.gameid;
       if (!confirm(`Delete game ${gid}? This cannot be undone.`)) return;
       try {
         const ok = deleteGame(state.ui.currentGroupId, Number(gid));
         if (!ok) { alert('Game not found'); return; }
-        refreshState();
-        renderAllForCurrent(); // re-render everything
+        renderAllForCurrent();
       } catch (err) {
         alert('Failed to delete: ' + (err.message || err));
       }
@@ -357,99 +543,140 @@ function renderHistory() {
   });
 }
 
-
-btnExportPDF.addEventListener('click', async () => {
-  // export current history table to PDF using jsPDF & autotable
+btnExportPDF.addEventListener('click', () => {
   refreshState();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
-  if (!group) { alert('Open a group'); return; }
+  const group = currentGroup();
+  if (!group) { alert('Create a group first'); return; }
 
+  const stats = computeTotalsAndAverages(group);
   const doc = new jspdf.jsPDF('landscape', 'pt', 'a4');
   const title = `History: ${group.name} (${new Date().toLocaleString()})`;
-  const columns = [{ header: 'Game Id', dataKey: 'gameId' }, { header: 'Date & Time', dataKey: 'dt' }];
-  group.people.forEach(p => columns.push({ header: p.name, dataKey: p.personId }));
+  const head = ['Game Id', 'Date & Time', ...group.people.map(p => p.name)];
 
-  const rows = group.games.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map(gm => {
-    const r = { gameId: gm.gameId, dt: formatLocalDateTimeISO(gm.timestamp) };
+  const body = group.games.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(gm => {
     const mp = {};
     gm.entries.forEach(e => mp[e.personId] = e);
-    group.people.forEach(p => r[p.personId] = (mp[p.personId] && mp[p.personId].participated) ? String(mp[p.personId].points) : '');
-    return r;
+    return [String(gm.gameId), formatLocalDateTimeISO(gm.timestamp),
+      ...group.people.map(p => (mp[p.personId] && mp[p.personId].participated) ? String(mp[p.personId].points) : '')];
   });
+  const foot = [];
+  if (group.people.some(p => Number(p.startPoints))) foot.push(['', 'Starting points', ...group.people.map(p => String(stats[p.personId].start || ''))]);
+  foot.push(['', 'Total', ...group.people.map(p => String(stats[p.personId].total))]);
+  foot.push(['', 'Average', ...group.people.map(p => stats[p.personId].played ? stats[p.personId].average.toFixed(2) : '')]);
 
   doc.text(title, 40, 40);
   doc.autoTable({
     startY: 60,
-    head: [columns.map(c => c.header)],
-    body: rows.map(r => columns.map(c => r[c.dataKey] || '')),
+    head: [head],
+    body,
+    foot,
     styles: { fontSize: 8 },
     theme: 'striped',
-    headStyles: { fillColor: [40, 120, 200] }
+    headStyles: { fillColor: [40, 120, 200] },
+    footStyles: { fillColor: [230, 230, 230], textColor: 20 }
   });
 
-  doc.save(`${group.name.replace(/\s+/g,'_')}_history.pdf`);
+  doc.save(`${group.name.replace(/\s+/g, '_')}_history.pdf`);
 });
 
 btnClearHistory.addEventListener('click', () => {
-  if (!confirm('Clear full history for this group?')) return;
+  const group = currentGroup();
+  if (!group || !group.games.length) return;
+  if (!confirm(`Clear all ${group.games.length} games for this group? Tip: download a backup first.`)) return;
   clearHistory(state.ui.currentGroupId);
-  refreshState(); renderAllForCurrent();
+  renderAllForCurrent();
 });
 
 /* Ranking UI */
-function renderRanking() {
-  refreshState();
-  const group = state.groups.find(g => g.groupId === state.ui.currentGroupId);
-  rankTotal.innerHTML = '';
-  rankAvg.innerHTML = '';
-  if (!group) { rankTotal.innerHTML = '<div class="text-muted small">Open a group</div>'; rankAvg.innerHTML = ''; return; }
-
-  const map = computeTotalsAndAverages(group);
-  const arr = Object.values(map);
-
-  // total ranking
-  const totalSorted = arr.slice().sort((a,b)=>{
-    if (b.total !== a.total) return b.total - a.total;
-    if (b.played !== a.played) return b.played - a.played;
-    return a.name.localeCompare(b.name);
-  });
-
-  const tableTotal = document.createElement('table');
-  tableTotal.className = 'table table-sm table-bordered';
-  const theadTotal = document.createElement('thead');
-  theadTotal.innerHTML = '<tr><th>#</th><th>Name</th><th>ID</th><th>Games</th><th>Total</th></tr>';
-  tableTotal.appendChild(theadTotal);
-  const tbodyTotal = document.createElement('tbody');
-  totalSorted.forEach((r, i) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.personId)}</td><td>${r.played}</td><td>${r.total}</td>`;
-    tbodyTotal.appendChild(tr);
-  });
-  tableTotal.appendChild(tbodyTotal);
-  rankTotal.appendChild(tableTotal);
-
-  // average ranking (exclude 0 games)
-  const avgSorted = arr.filter(x=>x.played>0).slice().sort((a,b)=>{
-    if (b.average !== a.average) return b.average - a.average;
-    if (b.played !== a.played) return b.played - a.played;
-    if (b.total !== a.total) return b.total - a.total;
-    return a.name.localeCompare(b.name);
-  });
-
-  const tableAvg = document.createElement('table');
-  tableAvg.className = 'table table-sm table-bordered';
-  const theadAvg = document.createElement('thead');
-  theadAvg.innerHTML = '<tr><th>#</th><th>Name</th><th>ID</th><th>Games</th><th>Total</th><th>Average</th></tr>';
-  tableAvg.appendChild(theadAvg);
-  const tbodyAvg = document.createElement('tbody');
-  avgSorted.forEach((r,i)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.personId)}</td><td>${r.played}</td><td>${r.total}</td><td>${r.average.toFixed(2)}</td>`;
-    tbodyAvg.appendChild(tr);
-  });
-  tableAvg.appendChild(tbodyAvg);
-  rankAvg.appendChild(tableAvg);
+function getRankMode() {
+  return (state.ui && state.ui.rankMode) === 'average' ? 'average' : 'total';
 }
+
+function renderRanking() {
+  const group = currentGroup();
+  const mode = getRankMode();
+  document.getElementById(mode === 'average' ? 'rankModeAvg' : 'rankModeTotal').checked = true;
+  const minGames = Math.max(1, Number(state.ui && state.ui.rankMinGames) || 1);
+  inpMinGames.value = minGames;
+  minGamesWrap.classList.toggle('d-none', mode !== 'average');
+
+  rankTable.innerHTML = '';
+  if (!group) { rankTable.innerHTML = '<div class="text-muted small">Create a group first</div>'; rankHint.textContent = ''; return; }
+
+  const arr = Object.values(computeTotalsAndAverages(group));
+  const hasStart = arr.some(x => x.start);
+
+  let ranked, unranked = [];
+  if (mode === 'average') {
+    rankHint.textContent = 'Average = points per game played. Fair for players who joined mid-way or skipped rounds; starting points are not included.';
+    ranked = arr.filter(x => x.played >= minGames).sort((a, b) =>
+      (b.average - a.average) || (b.played - a.played) || (b.total - a.total) || a.name.localeCompare(b.name));
+    unranked = arr.filter(x => x.played < minGames).sort((a, b) => b.played - a.played || a.name.localeCompare(b.name));
+  } else {
+    rankHint.textContent = hasStart ? 'Total = starting points + all game points.' : 'Total = sum of all game points.';
+    ranked = arr.sort((a, b) =>
+      (b.total - a.total) || (b.played - a.played) || a.name.localeCompare(b.name));
+  }
+  const key = mode === 'average' ? (r => r.average.toFixed(2)) : (r => r.total);
+
+  const table = document.createElement('table');
+  table.className = 'table table-sm table-bordered rank-table';
+  const sortedCls = (m) => (mode === m ? ' class="sorted"' : '');
+  table.innerHTML = `<thead><tr>
+      <th style="width:3rem">#</th><th>Name</th><th>Games</th>
+      ${hasStart ? '<th>Start</th>' : ''}
+      <th${sortedCls('total')}>Total</th><th${sortedCls('average')}>Average</th>
+    </tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  // competition ranking: equal scores share a rank (1, 2, 2, 4)
+  let prevKey = null, rank = 0;
+  ranked.forEach((r, i) => {
+    const k = key(r);
+    if (k !== prevKey) { rank = i + 1; prevKey = k; }
+    tbody.appendChild(rankRow(r, String(rank), hasStart, mode));
+  });
+  if (unranked.length) {
+    const sep = document.createElement('tr');
+    sep.innerHTML = `<td colspan="${hasStart ? 6 : 5}" class="small text-muted bg-light">Not ranked — fewer than ${minGames} game${minGames === 1 ? '' : 's'} played</td>`;
+    tbody.appendChild(sep);
+    unranked.forEach(r => tbody.appendChild(rankRow(r, '–', hasStart, mode, true)));
+  }
+  table.appendChild(tbody);
+  rankTable.appendChild(table);
+}
+
+function rankRow(r, rankLabel, hasStart, mode, muted = false) {
+  const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  const tr = document.createElement('tr');
+  if (muted) tr.className = 'text-muted';
+  const medal = medals[rankLabel] ? `<span class="rank-medal">${medals[rankLabel]}</span>` : rankLabel;
+  tr.innerHTML = `
+    <td>${medal}</td>
+    <td>${escapeHtml(r.name)} <small class="text-muted">(${escapeHtml(r.personId)})</small></td>
+    <td>${r.played}</td>
+    ${hasStart ? `<td>${r.start || ''}</td>` : ''}
+    <td${mode === 'total' ? ' class="sorted"' : ''}>${r.total}</td>
+    <td${mode === 'average' ? ' class="sorted"' : ''}>${r.played ? r.average.toFixed(2) : '–'}</td>`;
+  return tr;
+}
+
+document.querySelectorAll('input[name="rankMode"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const s = loadState();
+    s.ui.rankMode = radio.value;
+    saveState(s);
+    refreshState();
+    renderRanking();
+  });
+});
+inpMinGames.addEventListener('change', () => {
+  const s = loadState();
+  s.ui.rankMinGames = Math.max(1, parseInt(inpMinGames.value, 10) || 1);
+  saveState(s);
+  refreshState();
+  renderRanking();
+});
 
 /* helpers */
 function renderAllForCurrent() {
@@ -466,7 +693,21 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); });
 }
 
-function throwAlert(msg) { alert(msg); }
+function cssEscape(s) {
+  return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
+}
+
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
+  el.style.zIndex = 1100;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="d-flex"><div class="toast-body">${escapeHtml(msg)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+  document.body.appendChild(el);
+  const t = new bootstrap.Toast(el, { delay: 2000 });
+  el.addEventListener('hidden.bs.toast', () => el.remove());
+  t.show();
+}
 
 /* initial render */
 renderAllForCurrent();
