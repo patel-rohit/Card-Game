@@ -82,7 +82,7 @@ function renderGroups() {
   state.groups.forEach(g => {
     const opt = document.createElement('option');
     opt.value = g.groupId;
-    opt.textContent = `${g.name} (${g.people.length} players · ${g.games.length} games)`;
+    opt.textContent = `${g.name} (${g.people.length} player${g.people.length === 1 ? '' : 's'} · ${g.games.length} game${g.games.length === 1 ? '' : 's'})`;
     selCurrentGroup.appendChild(opt);
   });
   selCurrentGroup.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
