@@ -532,70 +532,62 @@ formLogGame.addEventListener('submit', (ev) => {
 });
 
 /* History UI */
+function getHistoryView() {
+  const v = state.ui && state.ui.historyView;
+  if (v === 'cards' || v === 'table') return v;
+  return window.matchMedia('(max-width: 767.98px)').matches ? 'cards' : 'table';
+}
+
+function signedPts(n) { return n > 0 ? '+' + n : String(n); }
+function ptsClass(n) { return n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero'; }
+
+function dayLabel(iso) {
+  const d = new Date(iso);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+}
+function timeLabel(iso) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderHistoryStats(group, stats) {
+  const el = document.getElementById('historyStats');
+  if (!group || !group.games.length) { el.innerHTML = ''; return; }
+  const ranked = Object.values(stats).sort((a, b) => (b.total - a.total) || (b.played - a.played));
+  const leader = ranked[0];
+  const newest = group.games.reduce((a, b) => (new Date(b.timestamp) > new Date(a.timestamp) ? b : a));
+  // biggest single-game score
+  let best = null;
+  group.games.forEach(g => g.entries.forEach(e => {
+    if (e.participated && (!best || Number(e.points) > best.points)) best = { points: Number(e.points), personId: e.personId, gameId: g.gameId };
+  }));
+  const nameOf = id => (stats[id] ? stats[id].name : id);
+  el.innerHTML = `
+    <div class="hist-stat"><div class="lbl">Games</div><div class="val">${group.games.length}</div></div>
+    <div class="hist-stat"><div class="lbl">Leader</div><div class="val gold">👑 ${escapeHtml(leader.name)} · ${leader.total}</div></div>
+    <div class="hist-stat"><div class="lbl">Best game</div><div class="val">${best ? `${escapeHtml(nameOf(best.personId))} ${signedPts(best.points)}` : '–'}</div></div>
+    <div class="hist-stat"><div class="lbl">Last played</div><div class="val">${escapeHtml(dayLabel(newest.timestamp))}</div></div>`;
+}
+
 function renderHistory() {
   const group = currentGroup();
+  const view = getHistoryView();
+  document.getElementById(view === 'cards' ? 'histViewCards' : 'histViewTable').checked = true;
   historyContainer.innerHTML = '';
-  if (!group) { historyContainer.innerHTML = '<div class="text-muted small">Create a group first</div>'; return; }
+  historyContainer.className = view === 'table' ? 'table-responsive-scroll' : '';
+  if (!group) { renderHistoryStats(null); historyContainer.innerHTML = '<div class="text-muted small">Create a group first</div>'; return; }
+  const stats = computeTotalsAndAverages(group);
+  renderHistoryStats(group, stats);
   if (!group.games.length) { historyContainer.innerHTML = '<div class="text-muted small">No games yet</div>'; return; }
 
-  const stats = computeTotalsAndAverages(group);
-  const hasStart = group.people.some(p => Number(p.startPoints));
-
-  const table = document.createElement('table');
-  table.className = 'table table-sm table-bordered table-hover history-table';
-  const thead = document.createElement('thead');
-  const headerTr = document.createElement('tr');
-  headerTr.innerHTML = '<th>#</th><th>Date & Time</th>';
-  group.people.forEach(p => {
-    const th = document.createElement('th');
-    th.textContent = p.name;
-    headerTr.appendChild(th);
-  });
-  headerTr.insertAdjacentHTML('beforeend', '<th></th>');
-  thead.appendChild(headerTr);
-  table.appendChild(thead);
-
-  const tbody = document.createElement('tbody');
+  const running = computeRunningTotals(group);
   const games = group.games.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  games.forEach(gm => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${gm.gameId}</td><td class="small">${formatLocalDateTimeISO(gm.timestamp)}</td>`;
-    const mp = {};
-    gm.entries.forEach(e => mp[e.personId] = e);
-    group.people.forEach(p => {
-      const cell = document.createElement('td');
-      const e = mp[p.personId];
-      if (e && e.participated) {
-        cell.textContent = e.points;
-        cell.className = e.points > 0 ? 'text-pos' : e.points < 0 ? 'text-neg' : '';
-      } else if (Number(gm.gameId) <= (Number(p.joinedAfterGameId) || 0) && !e) {
-        cell.innerHTML = '<span class="text-muted small" title="Not joined yet">–</span>';
-      }
-      tr.appendChild(cell);
-    });
-    const actionsCell = document.createElement('td');
-    actionsCell.innerHTML = `<div class="d-flex gap-1">
-      <button class="btn btn-sm btn-outline-secondary btn-edit-game" data-gameid="${gm.gameId}" title="Edit game">✎</button>
-      <button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}" title="Delete game">✕</button></div>`;
-    if (gm.editedAt) tr.children[0].title = 'Edited ' + formatLocalDateTimeISO(gm.editedAt);
-    tr.appendChild(actionsCell);
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-
-  const tfoot = document.createElement('tfoot');
-  const footRow = (label, fn) => {
-    const tr = document.createElement('tr');
-    tr.className = 'table-light fw-semibold';
-    tr.innerHTML = `<td colspan="2">${label}</td>` + group.people.map(p => `<td>${fn(stats[p.personId])}</td>`).join('') + '<td></td>';
-    tfoot.appendChild(tr);
-  };
-  if (hasStart) footRow('Starting points', s => s.start || '');
-  footRow('Total', s => s.total);
-  footRow('Average', s => (s.played ? s.average.toFixed(2) : ''));
-  table.appendChild(tfoot);
-
-  historyContainer.appendChild(table);
+  if (view === 'cards') renderHistoryCards(group, games, running);
+  else renderHistoryTable(group, games, running, stats);
 
   historyContainer.querySelectorAll('.btn-edit-game').forEach(btn => {
     btn.addEventListener('click', ev => startEditGame(Number(ev.currentTarget.dataset.gameid)));
@@ -621,38 +613,266 @@ function renderHistory() {
   });
 }
 
-btnExportPDF.addEventListener('click', () => {
+function gameActionsHtml(gm) {
+  return `<button class="btn btn-sm btn-outline-secondary btn-edit-game" data-gameid="${gm.gameId}" title="Edit game">✎</button>
+    <button class="btn btn-sm btn-outline-danger btn-delete-game" data-gameid="${gm.gameId}" title="Delete game">✕</button>`;
+}
+
+function renderHistoryCards(group, games, running) {
+  const nameOf = id => (group.people.find(p => p.personId === id) || { name: '(removed)' }).name;
+  let lastDay = null;
+  games.forEach(gm => {
+    const day = dayLabel(gm.timestamp);
+    if (day !== lastDay) {
+      historyContainer.insertAdjacentHTML('beforeend', `<div class="hist-day">${escapeHtml(day)}</div>`);
+      lastDay = day;
+    }
+    const played = gm.entries.filter(e => e.participated)
+      .map(e => ({ id: e.personId, name: nameOf(e.personId), points: Number(e.points) || 0 }))
+      .sort((a, b) => b.points - a.points);
+    const top = played.length ? played[0].points : null;
+    const sat = group.people.filter(p => !gm.entries.some(e => e.personId === p.personId && e.participated)
+      && Number(gm.gameId) > (Number(p.joinedAfterGameId) || 0)).map(p => p.name);
+    const sum = played.reduce((a, e) => a + e.points, 0);
+    const after = running[gm.gameId] || {};
+    const chips = played.map(e => `
+      <div class="score-chip${e.points === top && played.length > 1 ? ' win' : ''}">
+        <span class="nm">${e.points === top && played.length > 1 ? '👑 ' : ''}${escapeHtml(e.name)}</span>
+        <span class="vals"><span class="pts ${ptsClass(e.points)}">${signedPts(e.points)}</span><span class="run">score ${after[e.id] !== undefined ? after[e.id] : ''}</span></span>
+      </div>`).join('');
+    const foot = [
+      `${played.length} played · sum ${signedPts(sum)}`,
+      sat.length ? `sat out: ${sat.map(escapeHtml).join(', ')}` : '',
+      gm.editedAt ? `edited ${escapeHtml(formatLocalDateTimeISO(gm.editedAt))}` : ''
+    ].filter(Boolean).join(' · ');
+    historyContainer.insertAdjacentHTML('beforeend', `
+      <div class="game-card">
+        <div class="gc-head">
+          <span class="gc-no">#${gm.gameId}</span>
+          <span class="gc-time">${escapeHtml(timeLabel(gm.timestamp))}</span>
+          <div class="gc-actions">${gameActionsHtml(gm)}</div>
+        </div>
+        <div class="gc-body">${chips}</div>
+        <div class="gc-foot">${foot}</div>
+      </div>`);
+  });
+}
+
+function renderHistoryTable(group, games, running, stats) {
+  const hasStart = group.people.some(p => Number(p.startPoints));
+  const table = document.createElement('table');
+  table.className = 'table table-sm table-bordered table-hover history-table';
+  table.innerHTML = `<thead><tr><th>Game</th>${group.people.map(p => `<th>${escapeHtml(p.name)}</th>`).join('')}<th></th></tr></thead>`;
+
+  const tbody = document.createElement('tbody');
+  games.forEach(gm => {
+    const tr = document.createElement('tr');
+    const first = document.createElement('td');
+    first.innerHTML = `<b>#${gm.gameId}</b><span class="when">${escapeHtml(formatLocalDateTimeISO(gm.timestamp))}</span>`;
+    if (gm.editedAt) first.title = 'Edited ' + formatLocalDateTimeISO(gm.editedAt);
+    tr.appendChild(first);
+    const mp = {};
+    gm.entries.forEach(e => mp[e.personId] = e);
+    const playedPts = gm.entries.filter(e => e.participated).map(e => Number(e.points) || 0);
+    const top = playedPts.length > 1 ? Math.max(...playedPts) : null;
+    const after = running[gm.gameId] || {};
+    group.people.forEach(p => {
+      const cell = document.createElement('td');
+      const e = mp[p.personId];
+      if (e && e.participated) {
+        const pts = Number(e.points) || 0;
+        cell.innerHTML = `<span class="${pts > 0 ? 'text-pos' : pts < 0 ? 'text-neg' : ''}">${signedPts(pts)}</span><span class="run">score ${after[p.personId]}</span>`;
+        if (pts === top) cell.classList.add('win');
+      } else if (Number(gm.gameId) <= (Number(p.joinedAfterGameId) || 0) && !e) {
+        cell.innerHTML = '<span class="text-muted small" title="Not joined yet">–</span>';
+      }
+      tr.appendChild(cell);
+    });
+    const actionsCell = document.createElement('td');
+    actionsCell.innerHTML = `<div class="d-flex gap-1">${gameActionsHtml(gm)}</div>`;
+    tr.appendChild(actionsCell);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  const tfoot = document.createElement('tfoot');
+  const footRow = (label, fn) => {
+    const tr = document.createElement('tr');
+    tr.className = 'table-light fw-semibold';
+    tr.innerHTML = `<td>${label}</td>` + group.people.map(p => `<td>${fn(stats[p.personId])}</td>`).join('') + '<td></td>';
+    tfoot.appendChild(tr);
+  };
+  if (hasStart) footRow('Starting points', s => s.start || '');
+  footRow('Total', s => s.total);
+  footRow('Average', s => (s.played ? s.average.toFixed(2) : ''));
+  table.appendChild(tfoot);
+  historyContainer.appendChild(table);
+}
+
+document.querySelectorAll('input[name="historyView"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const s = loadState();
+    s.ui.historyView = radio.value;
+    saveState(s);
+    refreshState();
+    renderHistory();
+  });
+});
+
+/* PDF export: styled like the app, with each player's running score after every game */
+function loadImageDataUrl(src) {
+  return fetch(src).then(r => (r.ok ? r.blob() : null)).then(b => new Promise(resolve => {
+    if (!b) return resolve(null);
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => resolve(null);
+    fr.readAsDataURL(b);
+  })).catch(() => null);
+}
+
+btnExportPDF.addEventListener('click', async () => {
   refreshState();
   const group = currentGroup();
   if (!group) { alert('Create a group first'); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF) { alert('PDF library is not loaded. Check your internet connection and try again.'); return; }
 
+  const GREEN = [6, 58, 37], GOLD = [212, 175, 55], CREAM = [251, 250, 244], INK = [29, 29, 31];
+  const POS = [27, 138, 75], NEG = [198, 40, 40], MUTED = [120, 124, 128];
   const stats = computeTotalsAndAverages(group);
-  const doc = new jspdf.jsPDF('landscape', 'pt', 'a4');
-  const title = `History: ${group.name} (${new Date().toLocaleString()})`;
-  const head = ['Game Id', 'Date & Time', ...group.people.map(p => p.name)];
+  const running = computeRunningTotals(group);
+  const hasStart = group.people.some(p => Number(p.startPoints));
+  const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const logo = await loadImageDataUrl('assets/img/logo-192.png');
 
-  const body = group.games.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(gm => {
+  // header band
+  doc.setFillColor(...GREEN); doc.rect(0, 0, W, 84, 'F');
+  doc.setFillColor(...GOLD); doc.rect(0, 84, W, 3, 'F');
+  let tx = 30;
+  if (logo) { doc.addImage(logo, 'PNG', 28, 16, 52, 52); tx = 94; }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(...GOLD);
+  doc.text('Points Game', tx, 40);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(14); doc.setTextColor(255, 255, 255);
+  doc.text(group.name, tx, 62);
+  doc.setFontSize(10); doc.setTextColor(220, 235, 225);
+  doc.text(`${group.games.length} game${group.games.length === 1 ? '' : 's'} · ${group.people.length} player${group.people.length === 1 ? '' : 's'}`, W - 30, 40, { align: 'right' });
+  doc.text(`Generated ${formatLocalDateTimeISO(new Date().toISOString())}`, W - 30, 58, { align: 'right' });
+
+  const sectionTitle = (text, y) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...GREEN);
+    doc.text(text, 30, y);
+    doc.setDrawColor(...GOLD); doc.setLineWidth(1.2); doc.line(30, y + 5, W - 30, y + 5);
+  };
+
+  // standings (by total, same rules as the Ranking tab)
+  sectionTitle('Standings', 114);
+  const ranked = Object.values(stats).sort((a, b) => (b.total - a.total) || (b.played - a.played) || a.name.localeCompare(b.name));
+  let prev = null, rank = 0;
+  const standBody = ranked.map((r, i) => {
+    if (r.total !== prev) { rank = i + 1; prev = r.total; }
+    return [String(rank), r.name, String(r.played), ...(hasStart ? [String(r.start || '')] : []), String(r.total), r.played ? r.average.toFixed(2) : '-'];
+  });
+  const rankFill = { 1: [240, 205, 90], 2: [205, 210, 215], 3: [222, 160, 105] };
+  const totalCol = hasStart ? 4 : 3;
+  doc.autoTable({
+    startY: 126,
+    margin: { left: 30, right: 30 },
+    head: [['#', 'Player', 'Games', ...(hasStart ? ['Start'] : []), 'Total', 'Average']],
+    body: standBody,
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 5, textColor: INK, lineColor: [225, 222, 208], lineWidth: .5 },
+    headStyles: { fillColor: GREEN, textColor: GOLD, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: CREAM },
+    columnStyles: { 0: { halign: 'center', cellWidth: 34, fontStyle: 'bold' }, 1: { fontStyle: 'bold' } },
+    didParseCell: (h) => {
+      if (h.section !== 'body') return;
+      const rk = Number(h.row.raw[0]);
+      if (h.column.index === 0 && rankFill[rk]) h.cell.styles.fillColor = rankFill[rk];
+      if (h.column.index === totalCol) {
+        const v = Number(h.cell.raw);
+        h.cell.styles.fontStyle = 'bold';
+        h.cell.styles.textColor = v > 0 ? POS : v < 0 ? NEG : INK;
+      }
+    }
+  });
+
+  // game history with running totals
+  let y = doc.lastAutoTable.finalY + 34;
+  if (y > H - 120) { doc.addPage(); y = 50; }
+  sectionTitle('Game history', y);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
+  doc.text('Each cell: points in that game (green/red), and below it the player\'s score at that point (= running total). Highlighted = game winner. "-" = sat out.', 30, y + 20);
+
+  const n = group.people.length;
+  const fontSize = n <= 8 ? 9 : n <= 14 ? 8 : 7;
+  const games = group.games.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const winners = {};
+  const histBody = games.map(gm => {
     const mp = {};
     gm.entries.forEach(e => mp[e.personId] = e);
-    return [String(gm.gameId), formatLocalDateTimeISO(gm.timestamp),
-      ...group.people.map(p => (mp[p.personId] && mp[p.personId].participated) ? String(mp[p.personId].points) : '')];
+    const pts = gm.entries.filter(e => e.participated).map(e => Number(e.points) || 0);
+    winners[gm.gameId] = pts.length > 1 ? Math.max(...pts) : null;
+    const after = running[gm.gameId] || {};
+    return [`#${gm.gameId}`, formatLocalDateTimeISO(gm.timestamp).replace(' ', '\n'),
+      ...group.people.map(p => {
+        const e = mp[p.personId];
+        if (e && e.participated) return `${signedPts(Number(e.points) || 0)}\n= ${after[p.personId]}`;
+        if (Number(gm.gameId) <= (Number(p.joinedAfterGameId) || 0) && !e) return '';
+        return '-';
+      })];
   });
   const foot = [];
-  if (group.people.some(p => Number(p.startPoints))) foot.push(['', 'Starting points', ...group.people.map(p => String(stats[p.personId].start || ''))]);
+  if (hasStart) foot.push(['', 'Start', ...group.people.map(p => String(stats[p.personId].start || ''))]);
   foot.push(['', 'Total', ...group.people.map(p => String(stats[p.personId].total))]);
-  foot.push(['', 'Average', ...group.people.map(p => stats[p.personId].played ? stats[p.personId].average.toFixed(2) : '')]);
+  foot.push(['', 'Average', ...group.people.map(p => (stats[p.personId].played ? stats[p.personId].average.toFixed(2) : ''))]);
 
-  doc.text(title, 40, 40);
   doc.autoTable({
-    startY: 60,
-    head: [head],
-    body,
+    startY: y + 30,
+    margin: { left: 30, right: 30, bottom: 40 },
+    head: [['Game', 'Date', ...group.people.map(p => p.name)]],
+    body: histBody,
     foot,
-    styles: { fontSize: 8 },
-    theme: 'striped',
-    headStyles: { fillColor: [40, 120, 200] },
-    footStyles: { fillColor: [230, 230, 230], textColor: 20 }
+    showFoot: 'lastPage',
+    theme: 'grid',
+    styles: { fontSize, cellPadding: 4, halign: 'center', valign: 'middle', textColor: INK, lineColor: [225, 222, 208], lineWidth: .5 },
+    headStyles: { fillColor: GREEN, textColor: GOLD, fontStyle: 'bold' },
+    footStyles: { fillColor: [232, 240, 234], textColor: GREEN, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: CREAM },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 }, 1: { cellWidth: 70, textColor: MUTED, fontSize: fontSize - 1 } },
+    didParseCell: (h) => {
+      if (h.section !== 'body' || h.column.index < 2) return;
+      const raw = String(h.cell.raw || '');
+      if (raw === '-') { h.cell.styles.textColor = [170, 170, 170]; return; }
+      if (!raw) return;
+      const v = Number(raw.split('\n')[0]);
+      const gameId = Number(String(h.row.raw[0]).slice(1));
+      if (winners[gameId] !== null && v === winners[gameId]) h.cell.styles.fillColor = [255, 243, 196];
+      // keep the cell's size, draw the two lines ourselves in didDrawCell
+      h.cell.styles.textColor = h.cell.styles.fillColor || [255, 255, 255];
+    },
+    didDrawCell: (h) => {
+      if (h.section !== 'body' || h.column.index < 2) return;
+      const raw = String(h.cell.raw || '');
+      if (!raw || raw === '-') return;
+      const [ptsLine, runLine] = raw.split('\n');
+      const v = Number(ptsLine);
+      const cx = h.cell.x + h.cell.width / 2, cy = h.cell.y + h.cell.height / 2;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(fontSize);
+      doc.setTextColor(...(v > 0 ? POS : v < 0 ? NEG : MUTED));
+      doc.text(ptsLine, cx, cy - 2, { align: 'center' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(fontSize + 1); doc.setTextColor(...INK);
+      doc.text(runLine, cx, cy + fontSize - 1, { align: 'center' });
+    }
   });
+
+  // page footer
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(...MUTED); doc.setFont('helvetica', 'normal');
+    doc.text(`${group.name} · Points Game`, 30, H - 18);
+    doc.text(`Page ${i} of ${pages}`, W - 30, H - 18, { align: 'right' });
+  }
 
   doc.save(`${group.name.replace(/\s+/g, '_')}_history.pdf`);
 });
