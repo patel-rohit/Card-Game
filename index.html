@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <!-- Bump app-version (and the ?v= on the app scripts below) on every release so
        phones load the new files instead of an old cached copy. -->
-  <meta name="app-version" content="2026.11.08-6" />
+  <meta name="app-version" content="2026.11.08-7" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -14,10 +14,10 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Points Game" />
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.08-6" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.08-6" />
-  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.08-6" />
-  <link rel="manifest" href="manifest.webmanifest?v=2026.11.08-6" />
+  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.08-7" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.08-7" />
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.08-7" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.11.08-7" />
   <title>Points Game</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -284,6 +284,12 @@
     .history-table td .run { display: block; font-size: .72rem; color: var(--muted); }
     .history-table td.win { background: rgba(212,175,55,.16) !important; }
     .history-table td .when { display: block; font-size: .72rem; color: var(--muted); }
+    /* refresh */
+    .btn-refresh { white-space: nowrap; }
+    .btn-refresh .ri { display: inline-block; font-weight: 700; }
+    .btn-refresh.spinning .ri { animation: spin .6s linear; }
+    @media (min-width: 768px) { #inpLogFilter { width: 220px; } }
+
     /* share */
     .share-preview { background: rgba(0,0,0,.25); border-radius: .8rem; min-height: 160px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .share-preview img { width: 100%; height: auto; display: block; }
@@ -306,7 +312,7 @@
   <header class="app-header py-2 mb-3">
     <div class="container">
       <div class="d-flex align-items-center gap-2">
-        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.08-6" class="app-logo" width="44" height="44" alt="">Points Game</div>
+        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.08-7" class="app-logo" width="44" height="44" alt="">Points Game</div>
         <select id="selCurrentGroup" class="form-select form-select-sm w-auto d-none d-md-block" aria-label="Current group"></select>
         <button id="btnAddGroup" class="btn btn-primary icon-btn" title="New group" aria-label="New group">+</button>
         <div class="dropdown">
@@ -356,7 +362,10 @@
                 <button type="button" id="btnClearAll" class="btn btn-sm btn-outline-secondary">✕ None</button>
                 <button type="button" id="btnSetZero" class="btn btn-sm btn-outline-secondary" title="Fill empty points with 0">Fill 0</button>
               </div>
-              <input id="inpLogFilter" type="search" class="form-control form-control-sm ms-md-auto" style="max-width: 100%; min-width: 0" placeholder="🔍 Search player…"/>
+              <div class="d-flex gap-2 ms-md-auto">
+                <input id="inpLogFilter" type="search" class="form-control form-control-sm" style="max-width: 100%; min-width: 0" placeholder="🔍 Search player…"/>
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
+              </div>
             </div>
             <div id="editBanner" class="alert alert-warning py-2 d-flex align-items-center gap-2 d-none">
               <div>Editing <b id="lblEditGame"></b>. Change players or points, then save.</div>
@@ -387,6 +396,7 @@
                 <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
               </div>
               <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
                 <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary" title="Copy ranking as text (for WhatsApp etc.)">📋 Copy</button>
                 <button type="button" class="btn btn-sm btn-primary btn-open-share" title="Share standings to WhatsApp">📤 Share</button>
               </div>
@@ -406,6 +416,7 @@
                 <label class="btn btn-outline-primary" for="histViewTable">▦ Table</label>
               </div>
               <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
                 <button type="button" class="btn btn-primary btn-sm btn-open-share" title="Share standings to WhatsApp">📤 Share</button>
                 <button id="btnExportPDF" class="btn btn-outline-primary btn-sm" title="Download the history as a PDF">⬇️ PDF</button>
                 <button id="btnClearHistory" class="btn btn-outline-danger btn-sm" title="Delete all games of this group">Clear</button>
@@ -419,7 +430,10 @@
           <div class="tab-pane fade" id="pane-players">
             <div class="d-flex mb-2 align-items-center gap-2">
               <div class="small text-muted">Switch a player off if they are sitting out (they move to the end of Log Game).</div>
-              <button id="btnAddPerson" class="btn btn-primary btn-sm ms-auto text-nowrap">+ Add Player</button>
+              <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
+                <button id="btnAddPerson" class="btn btn-primary btn-sm text-nowrap">+ Add Player</button>
+              </div>
             </div>
             <div id="playersList" class="list-group"></div>
           </div>
@@ -507,10 +521,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js?v=2026.11.08-6"></script>
-  <script src="assets/js/models.js?v=2026.11.08-6"></script>
-  <script src="assets/js/ui.js?v=2026.11.08-6"></script>
-  <script src="assets/js/share.js?v=2026.11.08-6"></script>
-  <script src="assets/js/main.js?v=2026.11.08-6"></script>
+  <script src="assets/js/storage.js?v=2026.11.08-7"></script>
+  <script src="assets/js/models.js?v=2026.11.08-7"></script>
+  <script src="assets/js/ui.js?v=2026.11.08-7"></script>
+  <script src="assets/js/share.js?v=2026.11.08-7"></script>
+  <script src="assets/js/main.js?v=2026.11.08-7"></script>
 </body>
 </html>
