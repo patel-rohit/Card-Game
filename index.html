@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <!-- Bump app-version (and the ?v= on the app scripts below) on every release so
        phones load the new files instead of an old cached copy. -->
-  <meta name="app-version" content="2026.11.08-2" />
+  <meta name="app-version" content="2026.11.08-3" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -252,6 +252,13 @@
     .input-group-text { background: rgba(0,0,0,.35); color: var(--muted); border-color: rgba(255,255,255,.2); }
     kbd { background: #2a1d04; color: var(--gold); }
 
+    /* share */
+    .share-preview { background: rgba(0,0,0,.25); border-radius: .8rem; min-height: 160px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .share-preview img { width: 100%; height: auto; display: block; }
+    .share-preview img:not([src]) { width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 4px solid rgba(212,175,55,.3); border-top-color: var(--gold); animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-whatsapp { --bs-btn-color: #fff; --bs-btn-bg: #25d366; --bs-btn-border-color: #1ebe5b; --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #1ebe5b; --bs-btn-active-bg: #18a84f; --bs-btn-active-color: #fff; font-weight: 600; }
+
     @media (max-width: 767.98px) {
       .main-card { background: transparent; box-shadow: none; margin: 0; }
       #mainTabs { background: rgba(4,32,20,.97); border-top: 2px solid rgba(212,175,55,.5); }
@@ -347,7 +354,10 @@
                 <span class="input-group-text">Min games</span>
                 <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
               </div>
-              <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary ms-auto" title="Copy ranking as text (for WhatsApp etc.)">📋 Copy</button>
+              <div class="ms-auto d-flex gap-2">
+                <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary" title="Copy ranking as text (for WhatsApp etc.)">📋 Copy</button>
+                <button type="button" class="btn btn-sm btn-primary btn-open-share" title="Share standings to WhatsApp">📤 Share</button>
+              </div>
             </div>
             <div id="rankHint" class="small text-muted mb-2"></div>
             <div id="rankTable" class="table-responsive-scroll"></div>
@@ -358,6 +368,7 @@
             <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
               <div><strong>History</strong> <span class="text-muted small">(newest first)</span></div>
               <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-primary btn-sm btn-open-share" title="Share standings to WhatsApp">📤 Share</button>
                 <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">⬇️ PDF</button>
                 <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear</button>
               </div>
@@ -430,6 +441,25 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalShare" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Share standings</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="share-preview mb-3">
+            <img id="imgSharePreview" alt="Standings picture"/>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="button" id="btnShareImage" class="btn btn-primary btn-lg">📷 Share image</button>
+            <button type="button" id="btnShareWhatsApp" class="btn btn-whatsapp">💬 Send as text on WhatsApp</button>
+            <button type="button" id="btnShareCopy" class="btn btn-outline-secondary">📋 Copy text</button>
+          </div>
+          <div id="lblShareTip" class="small text-muted mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- libraries for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -438,9 +468,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js?v=2026.11.08-2"></script>
-  <script src="assets/js/models.js?v=2026.11.08-2"></script>
-  <script src="assets/js/ui.js?v=2026.11.08-2"></script>
-  <script src="assets/js/main.js?v=2026.11.08-2"></script>
+  <script src="assets/js/storage.js?v=2026.11.08-3"></script>
+  <script src="assets/js/models.js?v=2026.11.08-3"></script>
+  <script src="assets/js/ui.js?v=2026.11.08-3"></script>
+  <script src="assets/js/share.js?v=2026.11.08-3"></script>
+  <script src="assets/js/main.js?v=2026.11.08-3"></script>
 </body>
 </html>
