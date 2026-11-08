@@ -525,7 +525,7 @@ formLogGame.addEventListener('submit', (ev) => {
     // keep the same players selected for the next round, clear the points
     Object.keys(logDraft.selected).forEach(id => { logDraft.selected[id] = ''; });
     renderAllForCurrent();
-    showToast(`Game ${group.nextGameId} saved`);
+    showToast(`Game ${group.nextGameId} saved`, { label: 'Share', onClick: () => openShareDialog() });
   } catch (e) {
     alert('Failed to save game: ' + e.message);
   }
