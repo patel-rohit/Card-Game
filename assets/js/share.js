@@ -98,13 +98,22 @@ function fitText(ctx, text, maxWidth) {
   return t + '…';
 }
 
+function loadImage(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null); // the picture is still drawn without the logo
+    img.src = src;
+  });
+}
+
 async function drawShareImage(d) {
   try { if (document.fonts && document.fonts.load) await document.fonts.load('700 48px Cinzel'); } catch (e) { /* fallback font */ }
 
   const W = 1080, PAD = 60, ROW_H = 96, GAP = 14;
   const rows = d.rows.slice(0, 30);
   const lastH = d.lastGame && d.lastGame.entries.length ? 70 + Math.ceil(d.lastGame.entries.length / 3) * 64 : 0;
-  const H = 300 + rows.length * (ROW_H + GAP) + lastH + 110;
+  const H = 340 + rows.length * (ROW_H + GAP) + lastH + 110;
 
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
@@ -124,15 +133,25 @@ async function drawShareImage(d) {
 
   // header
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  const logo = await loadImage('assets/img/logo-192.png');
+  const brandY = 112;
   ctx.fillStyle = '#d4af37'; ctx.font = `700 34px ${serif}`;
-  ctx.fillText('♠  ♥  POINTS GAME  ♣  ♦', W / 2, 100);
+  const brand = 'POINTS GAME';
+  if (logo) {
+    const LS = 84, gap = 18, bw = ctx.measureText(brand).width, x0 = (W - (LS + gap + bw)) / 2;
+    ctx.drawImage(logo, x0, brandY - LS + 22, LS, LS);
+    ctx.textAlign = 'left'; ctx.fillText(brand, x0 + LS + gap, brandY);
+    ctx.textAlign = 'center';
+  } else {
+    ctx.fillText('♠  ♥  ' + brand + '  ♣  ♦', W / 2, brandY);
+  }
   ctx.fillStyle = '#ffffff'; ctx.font = `700 64px ${serif}`;
-  ctx.fillText(fitText(ctx, d.groupName, W - PAD * 2), W / 2, 180);
+  ctx.fillText(fitText(ctx, d.groupName, W - PAD * 2), W / 2, 215);
   ctx.fillStyle = 'rgba(232,243,236,.8)'; ctx.font = `400 32px ${sans}`;
-  ctx.fillText(`After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · ranked by ${d.mode === 'average' ? 'average' : 'total'}`, W / 2, 235);
+  ctx.fillText(`After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · ranked by ${d.mode === 'average' ? 'average' : 'total'}`, W / 2, 270);
 
   // standings as playing cards
-  let y = 280;
+  let y = 320;
   const suits = ['♠', '♥', '♣', '♦'];
   rows.forEach((r, i) => {
     const top3 = r.rank <= 3;
