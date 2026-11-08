@@ -199,7 +199,7 @@ function renderPlayersList() {
       <div class="flex-grow-1">
         <strong>${escapeHtml(p.name)}</strong> <small class="text-muted players-pid">(${escapeHtml(p.personId)})</small>
         <div class="small text-muted">
-          ${st.played} games · total ${st.total}
+          ${st.played} game${st.played === 1 ? "" : "s"} · total ${st.total}
           ${st.start ? ` · started with ${st.start}` : ''}
           ${lateJoin ? ` · joined after game ${p.joinedAfterGameId}` : ''}
         </div>
@@ -352,7 +352,7 @@ function renderLogPlayers() {
     tile.innerHTML = `
       <span class="tick">✓</span>
       <div class="pname" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
-      <div class="pmeta">Total ${st.total} · ${st.played} games${p.enabled === false ? ' · sitting out' : ''}</div>
+      <div class="pmeta">Total ${st.total} · ${st.played} game${st.played === 1 ? "" : "s"}${p.enabled === false ? ' · sitting out' : ''}</div>
       <div class="pts-wrap input-group input-group-sm">
         <button type="button" class="btn btn-outline-secondary btn-sign" title="Flip sign (+/−)">±</button>
         <input type="number" min="-1000" max="1000" step="1" class="form-control inp-pts" placeholder="Points"
@@ -990,6 +990,18 @@ inpMinGames.addEventListener('change', () => {
   saveState(s);
   refreshState();
   renderRanking();
+});
+
+/* Refresh: reload saved data and redraw every tab. A game being logged
+   (selected players and typed points) is kept. */
+document.querySelectorAll('.btn-refresh').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.remove('spinning');
+    void btn.offsetWidth; // restart the spin animation
+    btn.classList.add('spinning');
+    renderAllForCurrent();
+    showToast('Data refreshed');
+  });
 });
 
 /* helpers */
