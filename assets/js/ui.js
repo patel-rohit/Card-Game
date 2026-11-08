@@ -7,7 +7,7 @@ const groupSelects = [selCurrentGroup, selCurrentGroupMobile].filter(Boolean);
 const btnAddGroup = document.getElementById('btnAddGroup');
 const btnDeleteGroup = document.getElementById('btnDeleteGroup');
 const btnRenameGroup = document.getElementById('btnRenameGroup');
-const modalAddGroup = new bootstrap.Modal(document.getElementById('modalAddGroup'));
+const modalAddGroup = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAddGroup'));
 const formAddGroup = document.getElementById('formAddGroup');
 const inpGroupName = document.getElementById('inpGroupName');
 const chkMarkActive = document.getElementById('chkMarkActive');
@@ -22,7 +22,7 @@ const playersListEl = document.getElementById('playersList');
 const btnAddPerson = document.getElementById('btnAddPerson');
 
 const modalPersonEl = document.getElementById('modalPerson');
-const modalPerson = new bootstrap.Modal(modalPersonEl);
+const modalPerson = bootstrap.Modal.getOrCreateInstance(modalPersonEl);
 const formPerson = document.getElementById('formPerson');
 const lblPersonModalTitle = document.getElementById('lblPersonModalTitle');
 const btnPersonSubmit = document.getElementById('btnPersonSubmit');

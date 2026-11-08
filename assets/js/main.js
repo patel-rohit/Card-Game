@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const inp = document.getElementById('inpGroupName');
 
         if (chk) chk.checked = true;           // default active
-        const modal = new bootstrap.Modal(modalEl);
+        // reuse the instance ui.js created; a second instance could not be closed by the Create button
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.show();
         // autofocus name field when modal shown
         setTimeout(() => { if (inp) inp.focus(); }, 500);
