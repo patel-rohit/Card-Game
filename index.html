@@ -1,110 +1,329 @@
 <!doctype html>
-<html lang="en" data-bs-theme="light">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="color-scheme" content="light" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <!-- Bump app-version (and the ?v= on the app scripts below) on every release so
+       phones load the new files instead of an old cached copy. -->
+  <meta name="app-version" content="2026.11.08-2" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="theme-color" content="#063a25" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Points Game" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🃏%3C/text%3E%3C/svg%3E" />
   <title>Points Game</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet" />
 
   <!-- Bootstrap 5 CSS (CDN) -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
 
   <style>
-    :root { --tile-sel: #198754; --tile-sel-bg: #e9f7ef; }
-    body { background: #fff; color: #212529; padding-bottom: 5rem; }
-    .app-header { background: #fff; color: #212529; border-bottom: 1px solid #e9ecef; }
-    .app-header .form-select { min-width: 160px; }
-    .card { border: 1px solid #e9ecef; box-shadow: none; }
+    :root {
+      --tile-sel: #198754; --tile-sel-bg: #e9f7ef;
+      --line: #e9ecef; --muted: #6c757d; --accent: #0d6efd;
+      --nav-h: 62px; --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    html { -webkit-text-size-adjust: 100%; }
+    body { background: #fff; color: #212529; padding-bottom: 5rem; -webkit-tap-highlight-color: transparent; }
+    button, .btn, .player-tile, .nav-link { touch-action: manipulation; }
+
+    /* header */
+    .app-header { background: rgba(255,255,255,.96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 1020; }
+    .app-title { font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; }
+    .icon-btn { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1.15rem; line-height: 1; }
+    #selCurrentGroup { font-weight: 600; border-radius: .6rem; }
+
+    .main-card { border: 1px solid var(--line); border-radius: 1rem; }
     .table-responsive-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .nav-tabs .nav-link { font-weight: 500; }
-    .nav-tabs .badge { font-size: .7rem; }
+
+    /* tabs (top on desktop, bottom bar on phones) */
+    #mainTabs .nav-link { font-weight: 500; display: flex; align-items: center; gap: .35rem; position: relative; }
+    #mainTabs .nav-icon { font-size: 1.05rem; line-height: 1; }
+    #mainTabs .badge { font-size: .65rem; }
+
+    /* chip-style quick actions */
+    .chip-row { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+    .chip-row::-webkit-scrollbar { display: none; }
+    @media (min-width: 768px) { .chip-row { flex: 0 0 auto; } #inpLogFilter { max-width: 260px !important; } }
+    .chip-row .btn { border-radius: 999px; white-space: nowrap; flex: 0 0 auto; }
 
     /* Log game: player tiles */
     .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
     .player-tile {
-      position: relative; border: 2px solid #dee2e6; border-radius: .75rem; background: #fff;
-      padding: .6rem .7rem; cursor: pointer; user-select: none; transition: all .12s ease;
-      min-height: 70px;
+      position: relative; border: 2px solid #dee2e6; border-radius: .9rem; background: #fff;
+      padding: .65rem .75rem; cursor: pointer; user-select: none; transition: border-color .12s, background-color .12s, transform .08s;
+      min-height: 74px;
     }
+    .player-tile:active { transform: scale(.98); }
     .player-tile:hover { border-color: #adb5bd; }
     .player-tile:focus-visible { outline: 3px solid rgba(13,110,253,.4); outline-offset: 2px; }
     .player-tile.selected { border-color: var(--tile-sel); background: var(--tile-sel-bg); }
     .player-tile .tick {
-      position: absolute; top: .45rem; right: .55rem; width: 1.3rem; height: 1.3rem; border-radius: 50%;
+      position: absolute; top: .5rem; right: .6rem; width: 1.4rem; height: 1.4rem; border-radius: 50%;
       border: 2px solid #ced4da; display: flex; align-items: center; justify-content: center;
       font-size: .8rem; color: #fff;
     }
     .player-tile.selected .tick { background: var(--tile-sel); border-color: var(--tile-sel); }
-    .player-tile .pname { font-weight: 600; padding-right: 1.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .player-tile .pmeta { font-size: .75rem; color: #6c757d; }
-    .player-tile .pts-wrap { display: none; margin-top: .4rem; }
+    .player-tile .pname { font-weight: 600; padding-right: 1.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-tile .pmeta { font-size: .75rem; color: var(--muted); }
+    .player-tile .pts-wrap { display: none; margin-top: .45rem; }
     .player-tile.selected .pts-wrap { display: flex; }
+    .player-tile .pts-wrap .btn, .player-tile .pts-wrap .form-control { min-height: 40px; }
     .player-tile.inactive:not(.selected) { opacity: .55; }
-    .player-tile.add-tile { border-style: dashed; color: #6c757d; display: flex; align-items: center; justify-content: center; font-weight: 500; }
-    .player-tile.add-tile:hover { color: #0d6efd; border-color: #0d6efd; }
+    .player-tile.add-tile { border-style: dashed; color: var(--muted); display: flex; align-items: center; justify-content: center; font-weight: 500; text-align: center; }
+    .player-tile.add-tile:hover { color: var(--accent); border-color: var(--accent); }
     .sticky-save {
-      position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e9ecef;
+      position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--line);
       padding: .6rem 0; margin-top: .75rem; z-index: 5;
     }
 
     /* ranking */
-    .rank-medal { font-size: 1.1rem; }
+    .rank-medal { font-size: 1.15rem; }
     .rank-table td, .rank-table th { vertical-align: middle; }
     .rank-table .sorted { background: #fff8e1 !important; font-weight: 600; }
     .history-table th, .history-table td { white-space: nowrap; }
+    .history-table th:first-child, .history-table td:first-child { position: sticky; left: 0; background: #fff; z-index: 1; }
     .text-pos { color: #198754; }
     .text-neg { color: #dc3545; }
+
+    /* update banner */
+    #updateBar { display: flex; white-space: nowrap; width: max-content; max-width: calc(100% - 24px); position: fixed; left: 50%; transform: translateX(-50%); top: .6rem; z-index: 1100; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+
+    /* ---------- phones ---------- */
+    @media (max-width: 767.98px) {
+      body { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 1rem); }
+      /* stop iOS from zooming into inputs */
+      input, select, textarea, .form-control, .form-select { font-size: 16px !important; }
+      .container { padding-left: 12px; padding-right: 12px; }
+
+      .main-card { border: 0; border-radius: 0; }
+      .main-card > .card-body { padding: .25rem 0 0; }
+
+      #mainTabs {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030; margin: 0;
+        display: flex; flex-wrap: nowrap; background: rgba(255,255,255,.97); backdrop-filter: blur(8px);
+        border-top: 1px solid var(--line); border-bottom: 0;
+        padding-bottom: var(--safe-b); height: calc(var(--nav-h) + var(--safe-b));
+      }
+      #mainTabs .nav-item { flex: 1 1 0; }
+      #mainTabs .nav-link {
+        width: 100%; height: var(--nav-h); border: 0 !important; border-radius: 0; background: transparent !important;
+        flex-direction: column; justify-content: center; gap: 2px; font-size: .7rem; color: var(--muted); margin: 0;
+      }
+      #mainTabs .nav-icon { font-size: 1.35rem; filter: grayscale(1); opacity: .65; }
+      #mainTabs .nav-link.active { color: var(--accent); font-weight: 700; }
+      #mainTabs .nav-link.active .nav-icon { filter: none; opacity: 1; }
+      #mainTabs .badge { position: absolute; top: 6px; left: calc(50% + 8px); }
+      .tab-content { margin-top: .25rem !important; }
+
+      /* Save bar sits just above the bottom tab bar */
+      .sticky-save {
+        position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--safe-b));
+        padding: .55rem 12px; margin: 0; box-shadow: 0 -4px 12px rgba(0,0,0,.05);
+      }
+      .sticky-save .btn { flex: 0 0 auto; padding: .55rem 1.2rem; font-weight: 600; border-radius: .7rem; }
+      #pane-log { padding-bottom: 70px; }
+
+      .player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+
+      .rank-table .pid, .players-pid { display: none; }
+
+      /* dialogs slide up from the bottom like a native sheet */
+      .modal-dialog, .modal-dialog-scrollable { margin: 0; position: fixed; left: 0; right: 0; bottom: 0; max-width: none; height: auto; }
+      .modal.fade .modal-dialog { transform: translateY(100%); }
+      .modal.show .modal-dialog { transform: none; }
+      .modal-content { border: 0; border-radius: 1.1rem 1.1rem 0 0; padding-bottom: var(--safe-b); max-height: 92vh; overflow-y: auto; }
+      .modal-footer .btn { flex: 1; padding: .6rem; }
+
+      .app-toast { bottom: calc(var(--nav-h) + var(--safe-b) + 64px) !important; left: 12px; right: 12px; margin: 0 !important; width: auto; }
+    }
+    /* ================= Card table theme ================= */
+    :root {
+      --felt: #0b5d3b; --felt-deep: #063a25; --felt-ink: #e8f3ec;
+      --rail: #4a2c14; --gold: #d4af37; --gold-soft: rgba(212,175,55,.18);
+      --card: #fbfaf4; --card-ink: #1d1d1f; --suit-red: #c62828;
+      --line: rgba(255,255,255,.12); --muted: rgba(232,243,236,.68); --accent: var(--gold);
+      --bs-body-bg: var(--felt-deep); --bs-body-color: var(--felt-ink);
+      --bs-secondary-color: var(--muted); --bs-border-color: rgba(255,255,255,.16);
+      --bs-primary: var(--gold); --bs-primary-rgb: 212,175,55; --bs-link-color: var(--gold); --bs-link-hover-color: #f0d374;
+    }
+    body {
+      color: var(--felt-ink);
+      background-color: var(--felt-deep);
+      background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(32,160,100,.55) 0%, rgba(11,93,59,0) 60%),
+        radial-gradient(ellipse at 50% 120%, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 60%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, rgba(0,0,0,.012) 2px 4px),
+        linear-gradient(180deg, var(--felt) 0%, var(--felt-deep) 100%);
+      background-attachment: fixed;
+    }
+    .text-muted { color: var(--muted) !important; }
+
+    /* header */
+    .app-header { background: rgba(4,38,24,.88); border-bottom: 2px solid rgba(212,175,55,.55); box-shadow: 0 2px 14px rgba(0,0,0,.35); }
+    .app-title { font-family: 'Cinzel', Georgia, 'Times New Roman', serif; color: var(--gold); letter-spacing: .04em; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+    #selCurrentGroup, #selCurrentGroupMobile { background-color: rgba(0,0,0,.3); border-color: rgba(212,175,55,.45); color: var(--felt-ink); }
+
+    /* gold "chip" buttons */
+    .btn-primary, .btn-success:not(.toast .btn) {
+      --bs-btn-color: #2a1d04; --bs-btn-bg: var(--gold); --bs-btn-border-color: #b8932a;
+      --bs-btn-hover-color: #2a1d04; --bs-btn-hover-bg: #e2c055; --bs-btn-hover-border-color: #c9a33a;
+      --bs-btn-active-color: #2a1d04; --bs-btn-active-bg: #c49f2e; --bs-btn-active-border-color: #a8851f;
+      background-image: linear-gradient(180deg, #f1d77a 0%, #d4af37 55%, #b8932a 100%);
+      font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.4);
+    }
+    .btn-outline-primary { --bs-btn-color: var(--gold); --bs-btn-border-color: rgba(212,175,55,.6); --bs-btn-hover-bg: var(--gold); --bs-btn-hover-color: #2a1d04; --bs-btn-hover-border-color: var(--gold); --bs-btn-active-bg: var(--gold); --bs-btn-active-color: #2a1d04; --bs-btn-active-border-color: var(--gold); }
+    .btn-outline-secondary { --bs-btn-color: var(--felt-ink); --bs-btn-border-color: rgba(255,255,255,.28); --bs-btn-hover-bg: rgba(255,255,255,.12); --bs-btn-hover-color: #fff; --bs-btn-hover-border-color: rgba(255,255,255,.45); background-color: rgba(0,0,0,.18); }
+    .chip-row .btn { background-color: rgba(0,0,0,.25); border-color: rgba(212,175,55,.4); }
+
+    /* the table: felt with a wooden rail on larger screens */
+    .main-card {
+      background: rgba(4,45,28,.55); border: 0; border-radius: 1.6rem;
+      box-shadow: 0 0 0 7px var(--rail), 0 0 0 9px rgba(212,175,55,.35), 0 14px 40px rgba(0,0,0,.5), inset 0 0 60px rgba(0,0,0,.35);
+      margin: 10px 4px 0;
+    }
+    #mainTabs { border-bottom-color: var(--line); }
+    #mainTabs .nav-link { color: var(--muted); }
+    #mainTabs .nav-link:hover { color: var(--felt-ink); border-color: transparent; }
+    #mainTabs .nav-link.active { color: var(--gold); background: rgba(0,0,0,.28); border-color: rgba(212,175,55,.45) rgba(212,175,55,.45) transparent; }
+    #mainTabs .badge { background: var(--gold) !important; color: #2a1d04; }
+
+    /* player tiles become playing cards */
+    .player-tile {
+      background: var(--card); color: var(--card-ink); border: 2px solid transparent; border-radius: .7rem;
+      box-shadow: 0 3px 8px rgba(0,0,0,.4), inset 0 0 0 1px rgba(0,0,0,.06);
+      padding-left: 1.9rem; min-height: 92px; overflow: hidden;
+    }
+    .player-tile:not(.add-tile)::before {
+      content: '♠'; position: absolute; left: .55rem; top: .45rem; font-size: 1.05rem; line-height: 1; color: var(--card-ink);
+    }
+    .player-tile:not(.add-tile)::after {
+      content: '♠'; position: absolute; right: .35rem; bottom: -.55rem; font-size: 3.4rem; line-height: 1; color: var(--card-ink); opacity: .07; pointer-events: none; z-index: 0;
+    }
+    .player-tile:not(.add-tile):nth-child(4n+2)::before, .player-tile:not(.add-tile):nth-child(4n+2)::after { content: '♥'; color: var(--suit-red); }
+    .player-tile:not(.add-tile):nth-child(4n+3)::before, .player-tile:not(.add-tile):nth-child(4n+3)::after { content: '♣'; }
+    .player-tile:not(.add-tile):nth-child(4n+4)::before, .player-tile:not(.add-tile):nth-child(4n+4)::after { content: '♦'; color: var(--suit-red); }
+    .player-tile:hover { border-color: rgba(212,175,55,.6); }
+    .player-tile .pmeta { color: #5f6368; }
+    .player-tile .tick { border-color: #c9c9c2; }
+    .player-tile.selected {
+      background: #fffdf2; border-color: var(--gold); transform: translateY(-4px);
+      box-shadow: 0 10px 18px rgba(0,0,0,.45), 0 0 0 3px rgba(212,175,55,.35);
+    }
+    .player-tile.selected .tick { background: var(--gold); border-color: var(--gold); color: #2a1d04; }
+    .player-tile .form-control, .player-tile .btn-sign { background: #fff; color: #212529; border-color: #cfcfc6; }
+    .player-tile .form-control:focus { background: #fff; color: #212529; border-color: var(--gold); box-shadow: 0 0 0 .2rem rgba(212,175,55,.3); }
+    .player-tile .pname, .player-tile .pmeta, .player-tile .pts-wrap, .player-tile .tick { position: relative; z-index: 1; }
+    .player-tile .tick { position: absolute; }
+    .player-tile.add-tile { background: rgba(0,0,0,.18); border: 2px dashed rgba(212,175,55,.55); color: var(--gold); box-shadow: none; padding-left: .75rem; }
+    .player-tile.add-tile:hover { background: rgba(212,175,55,.1); color: #f0d374; border-color: var(--gold); }
+
+    .sticky-save { background: rgba(4,38,24,.94); border-top: 1px solid rgba(212,175,55,.35); }
+    #lblLogSummary { color: var(--muted) !important; }
+
+    /* tables */
+    .table { --bs-table-bg: rgba(0,0,0,.22); --bs-table-color: var(--felt-ink); --bs-table-border-color: rgba(255,255,255,.12); --bs-table-hover-bg: rgba(212,175,55,.08); --bs-table-hover-color: #fff; }
+    .table thead th { color: var(--gold); background: rgba(0,0,0,.35); font-weight: 600; }
+    .rank-table .sorted { background: var(--gold-soft) !important; color: #f6e3a1; }
+    .rank-table tbody tr:nth-child(-n+3) td { font-weight: 600; }
+    .history-table th:first-child, .history-table td:first-child { background: #07432b; }
+    .history-table tfoot tr, .table-light { --bs-table-bg: rgba(0,0,0,.4); --bs-table-color: #f6e3a1; --bs-table-border-color: rgba(255,255,255,.12); }
+    .table .bg-light, #joinMidway.bg-light { background: rgba(0,0,0,.28) !important; color: var(--muted); }
+    .text-pos { color: #6be39b; }
+    .text-neg { color: #ff8a80; }
+
+    /* lists, dialogs, menus */
+    .list-group { --bs-list-group-bg: rgba(0,0,0,.22); --bs-list-group-color: var(--felt-ink); --bs-list-group-border-color: rgba(255,255,255,.1); }
+    .form-check-input:checked { background-color: var(--gold); border-color: var(--gold); }
+    .modal-content { background: linear-gradient(180deg, #0c4e33 0%, #073a26 100%); border-top: 3px solid var(--gold); color: var(--felt-ink); }
+    .modal-header, .modal-footer { border-color: var(--line); }
+    .modal-title { font-family: 'Cinzel', Georgia, serif; color: var(--gold); }
+    .dropdown-menu { --bs-dropdown-bg: #0a4730; --bs-dropdown-link-hover-bg: rgba(212,175,55,.15); --bs-dropdown-border-color: rgba(212,175,55,.35); --bs-dropdown-header-color: var(--gold); }
+    .form-control, .form-select { background-color: rgba(0,0,0,.28); border-color: rgba(255,255,255,.2); color: var(--felt-ink); }
+    .form-control::placeholder { color: rgba(232,243,236,.5); }
+    .form-control:focus, .form-select:focus { border-color: var(--gold); box-shadow: 0 0 0 .2rem rgba(212,175,55,.25); background-color: rgba(0,0,0,.35); color: #fff; }
+    .input-group-text { background: rgba(0,0,0,.35); color: var(--muted); border-color: rgba(255,255,255,.2); }
+    kbd { background: #2a1d04; color: var(--gold); }
+
+    @media (max-width: 767.98px) {
+      .main-card { background: transparent; box-shadow: none; margin: 0; }
+      #mainTabs { background: rgba(4,32,20,.97); border-top: 2px solid rgba(212,175,55,.5); }
+      #mainTabs .nav-link { color: var(--muted); }
+      #mainTabs .nav-link.active { color: var(--gold); background: transparent !important; }
+      #mainTabs .nav-link.active::before { content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--gold); }
+      .sticky-save { box-shadow: 0 -6px 16px rgba(0,0,0,.35); }
+      .player-tile.selected { transform: translateY(-3px); }
+    }
   </style>
 </head>
 <body>
-  <header class="app-header py-3 mb-3">
-    <div class="container d-flex flex-wrap align-items-center gap-2">
-      <h4 class="m-0 me-auto">🃏 Points Game</h4>
-      <select id="selCurrentGroup" class="form-select form-select-sm w-auto" aria-label="Current group"></select>
-      <button id="btnAddGroup" class="btn btn-primary btn-sm">+ Group</button>
-      <div class="dropdown">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Menu</button>
-        <ul class="dropdown-menu dropdown-menu-end">
-          <li><h6 class="dropdown-header">Current group</h6></li>
-          <li><button class="dropdown-item" id="btnRenameGroup">Rename group…</button></li>
-          <li><button class="dropdown-item text-danger" id="btnDeleteGroup">Delete group…</button></li>
-          <li><hr class="dropdown-divider"></li>
-          <li><h6 class="dropdown-header">Backup</h6></li>
-          <li><button class="dropdown-item" id="btnExportJSON">Download backup (.json)</button></li>
-          <li><button class="dropdown-item" id="btnImportJSON">Restore from backup…</button></li>
-        </ul>
-        <input id="fileImportJSON" type="file" accept="application/json,.json" class="d-none"/>
+  <header class="app-header py-2 mb-3">
+    <div class="container">
+      <div class="d-flex align-items-center gap-2">
+        <div class="app-title me-auto">🃏 Points Game</div>
+        <select id="selCurrentGroup" class="form-select form-select-sm w-auto d-none d-md-block" aria-label="Current group"></select>
+        <button id="btnAddGroup" class="btn btn-primary icon-btn" title="New group" aria-label="New group">+</button>
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary icon-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Menu" aria-label="Menu">⋮</button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li><h6 class="dropdown-header">Current group</h6></li>
+            <li><button class="dropdown-item py-2" id="btnRenameGroup">✏️ Rename group…</button></li>
+            <li><button class="dropdown-item py-2 text-danger" id="btnDeleteGroup">🗑️ Delete group…</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Backup</h6></li>
+            <li><button class="dropdown-item py-2" id="btnExportJSON">⬇️ Download backup (.json)</button></li>
+            <li><button class="dropdown-item py-2" id="btnImportJSON">⬆️ Restore from backup…</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><button class="dropdown-item py-2" id="btnCheckUpdate">🔄 Check for update</button></li>
+            <li><span class="dropdown-item-text small text-muted" id="lblAppVersion"></span></li>
+          </ul>
+          <input id="fileImportJSON" type="file" accept="application/json,.json" class="d-none"/>
+        </div>
       </div>
+      <!-- phones: group picker gets its own full-width row -->
+      <select id="selCurrentGroupMobile" class="form-select mt-2 d-md-none" aria-label="Current group"></select>
     </div>
   </header>
 
+  <div id="updateBar" class="alert alert-primary py-2 px-3 d-none align-items-center gap-2 mb-0" role="status">
+    <span>New version available</span>
+    <button type="button" id="btnReloadApp" class="btn btn-sm btn-primary rounded-pill">Update</button>
+  </div>
+
   <div class="container">
-    <div class="card">
+    <div class="card main-card">
       <div class="card-body">
         <ul class="nav nav-tabs" id="mainTabs" role="tablist">
-          <li class="nav-item"><button class="nav-link active" id="tab-log" data-bs-toggle="tab" data-bs-target="#pane-log">Log Game</button></li>
-          <li class="nav-item"><button class="nav-link" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking">Ranking</button></li>
-          <li class="nav-item"><button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history">History <span id="badgeGames" class="badge rounded-pill text-bg-secondary"></span></button></li>
-          <li class="nav-item"><button class="nav-link" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players">Players <span id="badgePlayers" class="badge rounded-pill text-bg-secondary"></span></button></li>
+          <li class="nav-item"><button class="nav-link active" id="tab-log" data-bs-toggle="tab" data-bs-target="#pane-log"><span class="nav-icon">🎯</span><span>Log Game</span></button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking"><span class="nav-icon">🏆</span><span>Ranking</span></button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history"><span class="nav-icon">📜</span><span>History</span> <span id="badgeGames" class="badge rounded-pill text-bg-secondary"></span></button></li>
+          <li class="nav-item"><button class="nav-link" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players"><span class="nav-icon">👥</span><span>Players</span> <span id="badgePlayers" class="badge rounded-pill text-bg-secondary"></span></button></li>
         </ul>
 
         <div class="tab-content mt-3">
           <!-- Log Game -->
           <div class="tab-pane fade show active" id="pane-log">
-            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-              <div class="btn-group btn-group-sm" role="group" aria-label="Quick select">
-                <button type="button" id="btnCheckAll" class="btn btn-outline-secondary">All</button>
-                <button type="button" id="btnSelectLast" class="btn btn-outline-secondary" title="Select the players from the previous game">Same as last game</button>
-                <button type="button" id="btnClearAll" class="btn btn-outline-secondary">None</button>
+            <div class="d-flex flex-column flex-md-row gap-2 align-items-md-center mb-2">
+              <div class="chip-row" role="group" aria-label="Quick select">
+                <button type="button" id="btnCheckAll" class="btn btn-sm btn-outline-secondary">✔ All</button>
+                <button type="button" id="btnSelectLast" class="btn btn-sm btn-outline-secondary" title="Select the players from the previous game">↺ Same as last game</button>
+                <button type="button" id="btnClearAll" class="btn btn-sm btn-outline-secondary">✕ None</button>
+                <button type="button" id="btnSetZero" class="btn btn-sm btn-outline-secondary" title="Fill empty points with 0">Fill 0</button>
               </div>
-              <button type="button" id="btnSetZero" class="btn btn-sm btn-outline-secondary" title="Fill empty points with 0">Fill 0</button>
-              <input id="inpLogFilter" type="search" class="form-control form-control-sm ms-auto" style="max-width: 180px" placeholder="Search player…"/>
+              <input id="inpLogFilter" type="search" class="form-control form-control-sm ms-md-auto" style="max-width: 100%; min-width: 0" placeholder="🔍 Search player…"/>
             </div>
             <div id="editBanner" class="alert alert-warning py-2 d-flex align-items-center gap-2 d-none">
               <div>Editing <b id="lblEditGame"></b>. Change players or points, then save.</div>
               <button type="button" id="btnCancelEdit" class="btn btn-sm btn-outline-dark ms-auto">Cancel edit</button>
             </div>
-            <div class="small text-muted mb-2">Tap a player to include them, then enter their points. Press <kbd>Enter</kbd> to jump to the next player.</div>
+            <div class="small text-muted mb-2">Tap a player to include them, then enter their points.<span class="d-none d-md-inline"> Press <kbd>Enter</kbd> to jump to the next player.</span></div>
             <form id="formLogGame" autocomplete="off">
               <div id="logPlayersContainer"></div>
               <div class="sticky-save d-flex align-items-center gap-2">
@@ -128,7 +347,7 @@
                 <span class="input-group-text">Min games</span>
                 <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
               </div>
-              <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary ms-auto" title="Copy ranking as text (for WhatsApp etc.)">Copy ranking</button>
+              <button id="btnCopyRanking" class="btn btn-sm btn-outline-secondary ms-auto" title="Copy ranking as text (for WhatsApp etc.)">📋 Copy</button>
             </div>
             <div id="rankHint" class="small text-muted mb-2"></div>
             <div id="rankTable" class="table-responsive-scroll"></div>
@@ -139,8 +358,8 @@
             <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
               <div><strong>History</strong> <span class="text-muted small">(newest first)</span></div>
               <div class="ms-auto d-flex gap-2">
-                <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">Export PDF</button>
-                <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear History</button>
+                <button id="btnExportPDF" class="btn btn-outline-primary btn-sm">⬇️ PDF</button>
+                <button id="btnClearHistory" class="btn btn-outline-danger btn-sm">Clear</button>
               </div>
             </div>
             <div id="historyContainer" class="table-responsive-scroll"></div>
@@ -148,9 +367,9 @@
 
           <!-- Players -->
           <div class="tab-pane fade" id="pane-players">
-            <div class="d-flex mb-2 align-items-center">
-              <div class="small text-muted">Uncheck a player to mark them as sitting out (they move to the bottom of Log Game).</div>
-              <button id="btnAddPerson" class="btn btn-primary btn-sm ms-auto">+ Add Player</button>
+            <div class="d-flex mb-2 align-items-center gap-2">
+              <div class="small text-muted">Switch a player off if they are sitting out (they move to the end of Log Game).</div>
+              <button id="btnAddPerson" class="btn btn-primary btn-sm ms-auto text-nowrap">+ Add Player</button>
             </div>
             <div id="playersList" class="list-group"></div>
           </div>
@@ -161,7 +380,7 @@
 
   <!-- Modals -->
   <div class="modal fade" id="modalAddGroup" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
       <form id="formAddGroup" class="modal-content">
         <div class="modal-header"><h5 class="modal-title">Add Group</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -183,7 +402,7 @@
   </div>
 
   <div class="modal fade" id="modalPerson" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-scrollable">
       <form id="formPerson" class="modal-content" autocomplete="off">
         <div class="modal-header"><h5 class="modal-title" id="lblPersonModalTitle">Add Player</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -219,9 +438,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js"></script>
-  <script src="assets/js/models.js"></script>
-  <script src="assets/js/ui.js"></script>
-  <script src="assets/js/main.js"></script>
+  <script src="assets/js/storage.js?v=2026.11.08-2"></script>
+  <script src="assets/js/models.js?v=2026.11.08-2"></script>
+  <script src="assets/js/ui.js?v=2026.11.08-2"></script>
+  <script src="assets/js/main.js?v=2026.11.08-2"></script>
 </body>
 </html>

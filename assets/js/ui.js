@@ -2,10 +2,12 @@
 // depends on storage.js and models.js
 
 const selCurrentGroup = document.getElementById('selCurrentGroup');
+const selCurrentGroupMobile = document.getElementById('selCurrentGroupMobile');
+const groupSelects = [selCurrentGroup, selCurrentGroupMobile].filter(Boolean);
 const btnAddGroup = document.getElementById('btnAddGroup');
 const btnDeleteGroup = document.getElementById('btnDeleteGroup');
 const btnRenameGroup = document.getElementById('btnRenameGroup');
-const modalAddGroup = new bootstrap.Modal(document.getElementById('modalAddGroup'));
+const modalAddGroup = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAddGroup'));
 const formAddGroup = document.getElementById('formAddGroup');
 const inpGroupName = document.getElementById('inpGroupName');
 const chkMarkActive = document.getElementById('chkMarkActive');
@@ -20,7 +22,7 @@ const playersListEl = document.getElementById('playersList');
 const btnAddPerson = document.getElementById('btnAddPerson');
 
 const modalPersonEl = document.getElementById('modalPerson');
-const modalPerson = new bootstrap.Modal(modalPersonEl);
+const modalPerson = bootstrap.Modal.getOrCreateInstance(modalPersonEl);
 const formPerson = document.getElementById('formPerson');
 const lblPersonModalTitle = document.getElementById('lblPersonModalTitle');
 const btnPersonSubmit = document.getElementById('btnPersonSubmit');
@@ -72,20 +74,23 @@ function currentGroup() {
 /* Groups */
 function renderGroups() {
   refreshState();
-  selCurrentGroup.innerHTML = '';
-  if (!state.groups.length) {
-    const opt = document.createElement('option');
-    opt.textContent = 'No groups yet';
-    opt.value = '';
-    selCurrentGroup.appendChild(opt);
-  }
-  state.groups.forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g.groupId;
-    opt.textContent = `${g.name} (${g.people.length} player${g.people.length === 1 ? '' : 's'} · ${g.games.length} game${g.games.length === 1 ? '' : 's'})`;
-    selCurrentGroup.appendChild(opt);
+  // the same group picker is shown in the header (desktop) and on its own row (phones)
+  groupSelects.forEach(sel => {
+    sel.innerHTML = '';
+    if (!state.groups.length) {
+      const opt = document.createElement('option');
+      opt.textContent = 'No groups yet';
+      opt.value = '';
+      sel.appendChild(opt);
+    }
+    state.groups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.groupId;
+      opt.textContent = `${g.name} (${g.people.length} player${g.people.length === 1 ? '' : 's'} · ${g.games.length} game${g.games.length === 1 ? '' : 's'})`;
+      sel.appendChild(opt);
+    });
+    sel.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
   });
-  selCurrentGroup.value = state.ui.currentGroupId || (state.groups[0] && state.groups[0].groupId) || '';
   btnDeleteGroup.disabled = !currentGroup();
   btnRenameGroup.disabled = !currentGroup();
 
@@ -113,10 +118,10 @@ formAddGroup.addEventListener('submit', (ev) => {
   }
 });
 
-selCurrentGroup.addEventListener('change', () => {
-  const id = selCurrentGroup.value;
+groupSelects.forEach(sel => sel.addEventListener('change', () => {
+  const id = sel.value;
   if (id) { setCurrentGroup(id); renderAllForCurrent(); }
-});
+}));
 
 btnRenameGroup.addEventListener('click', () => {
   const group = currentGroup();
@@ -192,7 +197,7 @@ function renderPlayersList() {
         <input class="form-check-input chk-person-enabled" data-id="${escapeHtml(p.personId)}" type="checkbox" ${p.enabled ? 'checked' : ''}/>
       </div>
       <div class="flex-grow-1">
-        <strong>${escapeHtml(p.name)}</strong> <small class="text-muted">(${escapeHtml(p.personId)})</small>
+        <strong>${escapeHtml(p.name)}</strong> <small class="text-muted players-pid">(${escapeHtml(p.personId)})</small>
         <div class="small text-muted">
           ${st.played} games · total ${st.total}
           ${st.start ? ` · started with ${st.start}` : ''}
@@ -742,7 +747,7 @@ function rankRow(r, rankLabel, hasStart, mode, muted = false) {
   const medal = medals[rankLabel] ? `<span class="rank-medal">${medals[rankLabel]}</span>` : rankLabel;
   tr.innerHTML = `
     <td>${medal}</td>
-    <td>${escapeHtml(r.name)} <small class="text-muted">(${escapeHtml(r.personId)})</small></td>
+    <td>${escapeHtml(r.name)} <small class="text-muted pid">(${escapeHtml(r.personId)})</small></td>
     <td>${r.played}</td>
     ${hasStart ? `<td>${r.start || ''}</td>` : ''}
     <td${mode === 'total' ? ' class="sorted"' : ''}>${r.total}</td>
