@@ -49,3 +49,23 @@ function computeTotalsAndAverages(group) {
 
   return map;
 }
+
+// Running total of every player after each game, in game order.
+// returns { gameId -> { personId -> total after that game } } for players who played that game.
+// The total starts from the player's starting points (mid-way joiners), like the Total ranking.
+function computeRunningTotals(group) {
+  const run = {};
+  group.people.forEach(p => { run[p.personId] = Number(p.startPoints) || 0; });
+  const out = {};
+  group.games.slice().sort((a, b) => Number(a.gameId) - Number(b.gameId)).forEach(g => {
+    const after = {};
+    g.entries.forEach(e => {
+      if (!e.participated) return;
+      if (run[e.personId] === undefined) run[e.personId] = 0; // removed player
+      run[e.personId] += Number(e.points) || 0;
+      after[e.personId] = run[e.personId];
+    });
+    out[g.gameId] = after;
+  });
+  return out;
+}
