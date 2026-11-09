@@ -40,8 +40,10 @@ function buildShareData() {
   if (group.games.length) {
     const g = group.games.reduce((a, b) => (Number(b.gameId) > Number(a.gameId) ? b : a));
     const nameOf = id => (group.people.find(p => p.personId === id) || { name: id }).name;
+    const lead = gameLeader(g);
     lastGame = {
       gameId: g.gameId,
+      leader: lead ? { name: nameOf(lead.personId), result: lead.result } : null,
       entries: g.entries.filter(e => e.participated)
         .map(e => ({ name: nameOf(e.personId), points: Number(e.points) || 0 }))
         .sort((a, b) => b.points - a.points)
@@ -73,7 +75,8 @@ function buildShareText(d) {
   });
   if (d.lastGame && d.lastGame.entries.length) {
     lines.push('');
-    lines.push(`*Last game #${d.lastGame.gameId}:* ` + d.lastGame.entries.map(e => `${e.name} ${signed(e.points)}`).join(', '));
+    lines.push(`*Last game #${d.lastGame.gameId}:* ` + d.lastGame.entries.map(e => `${e.name} ${signed(e.points)}`).join(', ')
+      + (d.lastGame.leader ? ` · Leader: ${d.lastGame.leader.name} (${d.lastGame.leader.result})` : ''));
   }
   const url = appUrl();
   if (url) { lines.push(''); lines.push(`📲 ${url}`); }
@@ -192,7 +195,7 @@ async function drawShareImage(d) {
   if (lastH) {
     y += 20;
     ctx.textAlign = 'left'; ctx.fillStyle = '#d4af37'; ctx.font = `700 32px ${serif}`;
-    ctx.fillText(`Last game #${d.lastGame.gameId}`, PAD, y + 20);
+    ctx.fillText(fitText(ctx, `Last game #${d.lastGame.gameId}` + (d.lastGame.leader ? ` · Leader: ${d.lastGame.leader.name} (${d.lastGame.leader.result})` : ''), W - PAD * 2), PAD, y + 20);
     y += 46;
     const colW = (W - PAD * 2 - 2 * 16) / 3;
     d.lastGame.entries.forEach((e, i) => {

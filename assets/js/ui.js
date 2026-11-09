@@ -59,9 +59,12 @@ const btnCopyRanking = document.getElementById('btnCopyRanking');
 let state = loadState();
 
 // In-progress game being logged: survives re-renders (e.g. adding a player mid-way)
-// shape: { groupId, selected: { personId: pointsString }, editingGameId?, before? }
+// shape: { groupId, selected: { personId: pointsString }, leaderId?, leaderResult?, editingGameId?, before? }
+// leaderId / leaderResult ('won' | 'lost'): who led this game; only recorded, points are never changed.
 // While editing a past game, `before` holds the draft that was in progress so it can be restored.
 let logDraft = { groupId: null, selected: {} };
+
+const LEADER_SVG = '<svg class="lead-ico" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7z"/><rect x="5" y="19.2" width="14" height="2" rx="1"/></svg>';
 
 function refreshState() {
   state = loadState();
@@ -294,6 +297,7 @@ formPerson.addEventListener('submit', (ev) => {
       if (pid && pid !== personModalEditId && personModalEditId in logDraft.selected) {
         logDraft.selected[pid] = logDraft.selected[personModalEditId];
         delete logDraft.selected[personModalEditId];
+        if (logDraft.leaderId === personModalEditId) logDraft.leaderId = pid;
       }
     } else {
       const person = addPerson(state.ui.currentGroupId, pid, name, { startPoints });
@@ -318,6 +322,12 @@ function ensureDraftForGroup(group) {
       if (!group.people.some(p => p.personId === id)) delete logDraft.selected[id];
     });
   }
+  if (logDraft.leaderId && !(logDraft.leaderId in logDraft.selected)) clearLogLeader();
+}
+
+function clearLogLeader() {
+  delete logDraft.leaderId;
+  delete logDraft.leaderResult;
 }
 
 function renderLogPlayers() {
@@ -351,6 +361,7 @@ function renderLogPlayers() {
     tile.setAttribute('aria-checked', selected ? 'true' : 'false');
     tile.innerHTML = `
       <span class="tick">✓</span>
+      <span class="leader-ribbon" aria-hidden="true">Leader</span>
       <div class="pname" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
       <div class="pmeta">Total ${st.total} · ${st.played} game${st.played === 1 ? "" : "s"}${p.enabled === false ? ' · sitting out' : ''}</div>
       <div class="pts-wrap input-group input-group-sm">
@@ -358,6 +369,7 @@ function renderLogPlayers() {
         <input type="number" min="-1000" max="1000" step="1" class="form-control inp-pts" placeholder="Points"
                data-id="${escapeHtml(p.personId)}" value="${selected ? escapeHtml(logDraft.selected[p.personId]) : ''}">
       </div>
+      <button type="button" class="btn-leader" aria-pressed="false" title="Mark ${escapeHtml(p.name)} as this game's leader">${LEADER_SVG}<span>Leader</span></button>
     `;
     grid.appendChild(tile);
   });
@@ -377,6 +389,7 @@ function renderLogPlayers() {
     const input = tile.querySelector('.inp-pts');
     tile.addEventListener('click', ev => {
       if (ev.target.closest('.pts-wrap')) return; // clicks in the points box don't toggle
+      if (ev.target.closest('.btn-leader')) return;
       toggleLogPlayer(id, true);
     });
     tile.addEventListener('keydown', ev => {
@@ -392,6 +405,7 @@ function renderLogPlayers() {
       const next = inputs[inputs.indexOf(input) + 1];
       if (next) { next.focus(); next.select(); } else formLogGame.requestSubmit();
     });
+    tile.querySelector('.btn-leader').addEventListener('click', () => toggleLogLeader(id));
     tile.querySelector('.btn-sign').addEventListener('click', () => {
       const v = input.value.trim();
       input.value = v.startsWith('-') ? v.slice(1) : (v ? '-' + v : '-');
@@ -409,6 +423,7 @@ function toggleLogPlayer(id, focusInput) {
   const input = tile && tile.querySelector('.inp-pts');
   if (id in logDraft.selected) {
     delete logDraft.selected[id];
+    if (logDraft.leaderId === id) clearLogLeader();
     if (tile) { tile.classList.remove('selected'); tile.setAttribute('aria-checked', 'false'); input.value = ''; }
   } else {
     logDraft.selected[id] = '';
@@ -425,6 +440,7 @@ function setLogSelection(ids) {
   const prev = logDraft.selected;
   logDraft.selected = {};  // keeps editingGameId / before
   ids.forEach(id => { logDraft.selected[id] = prev[id] !== undefined ? prev[id] : ''; });
+  if (logDraft.leaderId && !ids.includes(logDraft.leaderId)) clearLogLeader();
   renderLogPlayers();
 }
 
@@ -436,18 +452,64 @@ function updateLogSummary() {
   lblLogSummary.innerHTML = n
     ? `<b>${n}</b> selected · ${filled.length}/${n} scored · sum <span class="${sum > 0 ? 'text-pos' : sum < 0 ? 'text-neg' : ''}">${sum}</span>`
     : 'No players selected';
+  updateLeaderUI();
 }
+
+/* Leader of the game being logged: at most one, only among selected players */
+const leaderPanel = document.getElementById('leaderPanel');
+const lblLeaderName = document.getElementById('lblLeaderName');
+
+function toggleLogLeader(id) {
+  if (!(id in logDraft.selected)) return;
+  if (logDraft.leaderId === id) clearLogLeader();
+  else { logDraft.leaderId = id; delete logDraft.leaderResult; }
+  updateLeaderUI();
+}
+
+function setLogLeaderResult(result) {
+  if (!logDraft.leaderId) return;
+  logDraft.leaderResult = result;
+  leaderPanel.classList.remove('need');
+  updateLeaderUI();
+}
+
+function updateLeaderUI() {
+  const id = logDraft.leaderId || null;
+  logPlayersContainer.querySelectorAll('.player-tile[data-id]').forEach(tile => {
+    const on = tile.dataset.id === id;
+    tile.classList.toggle('leader', on);
+    const btn = tile.querySelector('.btn-leader');
+    if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const group = currentGroup();
+  const person = id && group ? group.people.find(p => p.personId === id) : null;
+  leaderPanel.classList.toggle('d-none', !id);
+  document.getElementById('pane-log').classList.toggle('has-leader', !!id);
+  if (!id) { leaderPanel.classList.remove('need'); return; }
+  lblLeaderName.textContent = person ? person.name : id;
+  leaderPanel.querySelectorAll('.lp-btn').forEach(b => {
+    const on = b.dataset.result === logDraft.leaderResult;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+leaderPanel.querySelectorAll('.lp-btn').forEach(b => b.addEventListener('click', () => setLogLeaderResult(b.dataset.result)));
+document.getElementById('btnLeaderClear').addEventListener('click', () => { clearLogLeader(); updateLeaderUI(); });
 
 function startEditGame(gameId) {
   const group = currentGroup();
   const game = group && group.games.find(g => Number(g.gameId) === Number(gameId));
   if (!game) return;
-  const before = logDraft.editingGameId != null ? logDraft.before : { selected: logDraft.selected };
+  const before = logDraft.editingGameId != null ? logDraft.before
+    : { selected: logDraft.selected, leaderId: logDraft.leaderId, leaderResult: logDraft.leaderResult };
   const selected = {};
   game.entries.forEach(e => {
     if (e.participated && group.people.some(p => p.personId === e.personId)) selected[e.personId] = String(e.points);
   });
   logDraft = { groupId: group.groupId, selected, editingGameId: game.gameId, before };
+  const lead = gameLeader(game);
+  if (lead && lead.personId in selected) { logDraft.leaderId = lead.personId; logDraft.leaderResult = lead.result; }
   inpLogFilter.value = '';
   renderLogPlayers();
   new bootstrap.Tab(document.querySelector('#tab-log')).show();
@@ -455,7 +517,12 @@ function startEditGame(gameId) {
 
 function stopEditGame() {
   if (logDraft.editingGameId == null) return;
-  logDraft = { groupId: logDraft.groupId, selected: (logDraft.before && logDraft.before.selected) || {} };
+  const before = logDraft.before || {};
+  logDraft = { groupId: logDraft.groupId, selected: before.selected || {} };
+  if (before.leaderId && before.leaderId in logDraft.selected) {
+    logDraft.leaderId = before.leaderId;
+    if (before.leaderResult) logDraft.leaderResult = before.leaderResult;
+  }
   renderLogPlayers();
 }
 
@@ -506,6 +573,18 @@ formLogGame.addEventListener('submit', (ev) => {
     rows.push({ personId: p.personId, participated, points });
   }
 
+  // leader is optional, but when one is marked the result is needed
+  if (logDraft.leaderId && !(logDraft.leaderId in logDraft.selected)) clearLogLeader();
+  if (logDraft.leaderId && logDraft.leaderResult !== 'won' && logDraft.leaderResult !== 'lost') {
+    leaderPanel.classList.add('need');
+    alert('Did the leader win or lose? Tap Won or Lost next to the leader before saving.');
+    leaderPanel.querySelector('.lp-btn').focus();
+    return;
+  }
+  const leader = logDraft.leaderId
+    ? { personId: logDraft.leaderId, result: logDraft.leaderResult, source: 'manual' }
+    : null;
+
   const blanks = ids.filter(id => String(logDraft.selected[id]).trim() === '');
   if (blanks.length && !confirm(`${blanks.length} selected player(s) have no points. Save them as 0?`)) return;
 
@@ -515,15 +594,21 @@ formLogGame.addEventListener('submit', (ev) => {
       const original = group.games.find(g => Number(g.gameId) === Number(gameId));
       // keep entries of players who were removed from the group since this game
       const extra = original ? original.entries.filter(e => !group.people.some(p => p.personId === e.personId)) : [];
-      updateGame(group.groupId, gameId, rows.concat(extra));
+      // leader: unchanged -> leave as saved (also keeps an old game "not reviewed yet" when no leader was picked)
+      const old = original ? gameLeader(original) : null;
+      let newLeader = leader;
+      if (old && leader && old.personId === leader.personId && old.result === leader.result) newLeader = undefined;
+      else if (!leader && original && (original.leader === undefined || (original.leader !== null && !old))) newLeader = undefined;
+      updateGame(group.groupId, gameId, rows.concat(extra), newLeader);
       stopEditGame();
       renderAllForCurrent();
       showToast(`Game ${gameId} updated`);
       return;
     }
-    addGame(group.groupId, rows);
-    // keep the same players selected for the next round, clear the points
+    addGame(group.groupId, rows, leader);
+    // keep the same players selected for the next round, clear the points and the leader
     Object.keys(logDraft.selected).forEach(id => { logDraft.selected[id] = ''; });
+    clearLogLeader();
     renderAllForCurrent();
     showToast(`Game ${group.nextGameId} saved`, { label: 'Share', onClick: () => openShareDialog() });
   } catch (e) {
@@ -539,6 +624,7 @@ function getHistoryView() {
 }
 
 function signedPts(n) { return n > 0 ? '+' + n : String(n); }
+function leaderResultLabel(l) { return l.result === 'won' ? 'Won' : 'Lost'; }
 function ptsClass(n) { return n > 0 ? 'pos' : n < 0 ? 'neg' : 'zero'; }
 
 function dayLabel(iso) {
@@ -635,15 +721,22 @@ function renderHistoryCards(group, games, running) {
       && Number(gm.gameId) > (Number(p.joinedAfterGameId) || 0)).map(p => p.name);
     const sum = played.reduce((a, e) => a + e.points, 0);
     const after = running[gm.gameId] || {};
-    const chips = played.map(e => `
-      <div class="score-chip${e.points === top && played.length > 1 ? ' win' : ''}">
-        ${group.people.some(p => p.personId === e.id)
+    const lead = gameLeader(gm);
+    const chips = played.map(e => {
+      const isLead = !!lead && lead.personId === e.id;
+      const nm = `${group.people.some(p => p.personId === e.id)
           ? `<button type="button" class="nm btn-player-summary" data-id="${escapeHtml(e.id)}" title="Show ${escapeHtml(e.name)}'s summary">`
-          : '<span class="nm">'}${e.points === top && played.length > 1 ? '👑 ' : ''}${escapeHtml(e.name)}${group.people.some(p => p.personId === e.id) ? '</button>' : '</span>'}
+          : '<span class="nm">'}${e.points === top && played.length > 1 ? '👑 ' : ''}${escapeHtml(e.name)}${group.people.some(p => p.personId === e.id) ? '</button>' : '</span>'}`;
+      return `
+      <div class="score-chip${e.points === top && played.length > 1 ? ' win' : ''}${isLead ? ' lead' : ''}">
+        ${nm}
         <span class="vals"><span class="pts ${ptsClass(e.points)}">${signedPts(e.points)}</span><span class="run">score ${after[e.id] !== undefined ? after[e.id] : ''}</span></span>
-      </div>`).join('');
+        ${isLead ? `<span class="lead-line"><span class="lead-pill ${lead.result}" title="Leader of this game – ${lead.result}">${LEADER_SVG}Leader · ${leaderResultLabel(lead)}</span></span>` : ''}
+      </div>`;
+    }).join('');
     const foot = [
       `${played.length} played · sum ${signedPts(sum)}`,
+      lead ? `leader: ${escapeHtml(nameOf(lead.personId))} (${lead.result})` : '',
       sat.length ? `sat out: ${sat.map(escapeHtml).join(', ')}` : '',
       gm.editedAt ? `edited ${escapeHtml(formatLocalDateTimeISO(gm.editedAt))}` : ''
     ].filter(Boolean).join(' · ');
@@ -678,12 +771,15 @@ function renderHistoryTable(group, games, running, stats) {
     const playedPts = gm.entries.filter(e => e.participated).map(e => Number(e.points) || 0);
     const top = playedPts.length > 1 ? Math.max(...playedPts) : null;
     const after = running[gm.gameId] || {};
+    const lead = gameLeader(gm);
     group.people.forEach(p => {
       const cell = document.createElement('td');
       const e = mp[p.personId];
       if (e && e.participated) {
         const pts = Number(e.points) || 0;
-        cell.innerHTML = `<span class="${pts > 0 ? 'text-pos' : pts < 0 ? 'text-neg' : ''}">${signedPts(pts)}</span><span class="run">score ${after[p.personId]}</span>`;
+        const badge = lead && lead.personId === p.personId
+          ? ` <span class="lead-badge ${lead.result}" title="Leader – ${lead.result}">L</span>` : '';
+        cell.innerHTML = `<span class="${pts > 0 ? 'text-pos' : pts < 0 ? 'text-neg' : ''}">${signedPts(pts)}</span>${badge}<span class="run">score ${after[p.personId]}</span>`;
         if (pts === top) cell.classList.add('win');
       } else if (Number(gm.gameId) <= (Number(p.joinedAfterGameId) || 0) && !e) {
         cell.innerHTML = '<span class="text-muted small" title="Not joined yet">–</span>';
@@ -803,7 +899,17 @@ btnExportPDF.addEventListener('click', async () => {
   if (y > H - 120) { doc.addPage(); y = 50; }
   sectionTitle('Game history', y);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...MUTED);
-  doc.text('Each cell: points in that game (green/red), and below it the player\'s score at that point (= running total). Highlighted = game winner. "-" = sat out.', 30, y + 20);
+  const legend = 'Each cell: points in that game (green/red), and below it the player\'s score at that point (= running total). Highlighted = game winner. "-" = sat out.';
+  doc.text(legend, 30, y + 20);
+  // leader of each game (only recorded, never changes points)
+  const leaders = {};
+  group.games.forEach(gm => { const l = gameLeader(gm); if (l) leaders[gm.gameId] = l; });
+  const hasLeaders = Object.keys(leaders).length > 0;
+  if (hasLeaders) {
+    const extra = 'L = leader (green won, red lost).';
+    if (30 + doc.getTextWidth(legend + '  ' + extra) <= W - 30) doc.text(extra, 30 + doc.getTextWidth(legend + '  '), y + 20);
+    else doc.text(extra, W - 30, y - 2, { align: 'right' });
+  }
 
   const n = group.people.length;
   const fontSize = n <= 8 ? 9 : n <= 14 ? 8 : 7;
@@ -864,6 +970,15 @@ btnExportPDF.addEventListener('click', async () => {
       doc.text(ptsLine, cx, cy - 2, { align: 'center' });
       doc.setFont('helvetica', 'bold'); doc.setFontSize(fontSize + 1); doc.setTextColor(...INK);
       doc.text(runLine, cx, cy + fontSize - 1, { align: 'center' });
+      const lead = hasLeaders ? leaders[Number(String(h.row.raw[0]).slice(1))] : null;
+      const person = group.people[h.column.index - 2];
+      if (lead && person && lead.personId === person.personId) {
+        const bs = fontSize + 3, bx = h.cell.x + h.cell.width - bs - 2, by = h.cell.y + 2;
+        doc.setFillColor(...(lead.result === 'won' ? POS : NEG));
+        doc.roundedRect(bx, by, bs, bs, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(fontSize - 1); doc.setTextColor(255, 255, 255);
+        doc.text('L', bx + bs / 2, by + bs / 2 + (fontSize - 1) * 0.35, { align: 'center' });
+      }
     }
   });
 
@@ -906,6 +1021,9 @@ function renderRanking() {
 
   const arr = Object.values(computeTotalsAndAverages(group));
   const hasStart = arr.some(x => x.start);
+  // games as leader (won–lost): extra column on larger screens, only once leaders are recorded
+  const ledStats = computeLeaderStats(group);
+  const led = Object.keys(ledStats).length ? ledStats : null;
 
   let ranked, unranked = [];
   if (mode === 'average') {
@@ -928,6 +1046,7 @@ function renderRanking() {
       <th style="width:3rem">#</th><th>Name</th><th>Games</th>
       ${hasStart ? '<th>Start</th>' : ''}
       <th${sortedCls('total')}>Total</th><th${sortedCls('average')}>Average</th>
+      ${led ? '<th class="d-none d-md-table-cell" title="Games as leader: won–lost">Led (W–L)</th>' : ''}
     </tr></thead>`;
   const tbody = document.createElement('tbody');
 
@@ -936,15 +1055,15 @@ function renderRanking() {
   ranked.forEach((r, i) => {
     const k = key(r);
     if (k !== prevKey) { rank = i + 1; prevKey = k; }
-    tbody.appendChild(rankRow(r, String(rank), hasStart, mode));
+    tbody.appendChild(rankRow(r, String(rank), hasStart, mode, false, led));
     lines.push(`${rank}. ${r.name}: ${mode === 'average' ? r.average.toFixed(2) + ' avg' : r.total + ' pts'} (${r.played} game${r.played === 1 ? '' : 's'})`);
   });
   rankingText = lines.join('\n');
   if (unranked.length) {
     const sep = document.createElement('tr');
-    sep.innerHTML = `<td colspan="${hasStart ? 6 : 5}" class="small text-muted bg-light">Not ranked — fewer than ${minGames} game${minGames === 1 ? '' : 's'} played</td>`;
+    sep.innerHTML = `<td colspan="${(hasStart ? 6 : 5) + (led ? 1 : 0)}" class="small text-muted bg-light">Not ranked — fewer than ${minGames} game${minGames === 1 ? '' : 's'} played</td>`;
     tbody.appendChild(sep);
-    unranked.forEach(r => tbody.appendChild(rankRow(r, '–', hasStart, mode, true)));
+    unranked.forEach(r => tbody.appendChild(rankRow(r, '–', hasStart, mode, true, led)));
   }
   table.appendChild(tbody);
   rankTable.appendChild(table);
@@ -964,7 +1083,8 @@ btnCopyRanking.addEventListener('click', async () => {
 
 const CHEVRON_SVG = '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-function rankRow(r, rankLabel, hasStart, mode, muted = false) {
+// led: { personId -> { won, lost } } adds the desktop-only "Led (W–L)" cell; null = no column
+function rankRow(r, rankLabel, hasStart, mode, muted = false, led = null) {
   const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
   const tr = document.createElement('tr');
   if (muted) tr.className = 'text-muted';
@@ -980,7 +1100,8 @@ function rankRow(r, rankLabel, hasStart, mode, muted = false) {
     <td>${r.played}</td>
     ${hasStart ? `<td>${r.start || ''}</td>` : ''}
     <td${mode === 'total' ? ' class="sorted"' : ''}>${r.total}</td>
-    <td${mode === 'average' ? ' class="sorted"' : ''}>${r.played ? r.average.toFixed(2) : '–'}</td>`;
+    <td${mode === 'average' ? ' class="sorted"' : ''}>${r.played ? r.average.toFixed(2) : '–'}</td>
+    ${led ? `<td class="d-none d-md-table-cell">${led[r.personId] ? `${led[r.personId].won}–${led[r.personId].lost}` : ''}</td>` : ''}`;
   return tr;
 }
 
@@ -1021,6 +1142,7 @@ function renderAllForCurrent() {
   renderLogPlayers();
   renderHistory();
   renderRanking();
+  if (typeof updateLeaderReviewBanner === 'function') updateLeaderReviewBanner();
 }
 
 function escapeHtml(s) {

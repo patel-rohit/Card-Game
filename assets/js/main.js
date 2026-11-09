@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Ensure UI is rendered in either case
   // (ui.js already calls renderAllForCurrent() initially; call it here to be safe)
   try { renderAllForCurrent(); } catch (e) { console.warn(e); }
+
+  // old games without a leader note: offer to review them (leaders.js); never changes points
+  try { if (s.groups.length) maybeOpenLeaderReview(); } catch (e) { console.warn(e); }
 });
 
 /* Update check: GitHub Pages and phone browsers cache files for a while, so a
