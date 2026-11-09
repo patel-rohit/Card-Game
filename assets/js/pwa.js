@@ -93,14 +93,48 @@ function openTabFromUrl() {
   if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
 }
 
+// Hard refresh: drop the cached app files and the service worker, then load everything
+// fresh from the network. Games and backups live in localStorage and are not touched.
+async function hardRefresh() {
+  if (!confirm('Reload the app files fresh from the internet?\n\nYour games, players and backups stay on this device — only the app\'s cached files are cleared.')) return;
+  try {
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(k => k.startsWith('points-game-')).map(k => caches.delete(k)));
+    }
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) { /* reload anyway */ }
+  const url = new URL(location.href);
+  url.searchParams.set('v', Date.now());
+  location.replace(url.toString());
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnInstall').addEventListener('click', promptInstall);
   document.getElementById('btnInstallMenu').addEventListener('click', promptInstall);
-  // the Update bar also activates a waiting service worker, so the reload gets the new files
-  document.getElementById('btnReloadApp').addEventListener('click', () => {
+  document.getElementById('btnHardRefresh').addEventListener('click', hardRefresh);
+  // Update with a new service worker waiting: switch to it first and reload once it has
+  // taken over, instead of reloading while it is still activating. Capture phase so this
+  // runs before the plain reload handler in main.js (used when no worker is waiting).
+  document.getElementById('btnReloadApp').addEventListener('click', (ev) => {
     const waiting = pwa.registration && pwa.registration.waiting;
-    if (waiting) waiting.postMessage('SKIP_WAITING');
-  });
+    if (!waiting || !navigator.serviceWorker.controller) return;
+    ev.stopImmediatePropagation();
+    let done = false;
+    const reload = () => {
+      if (done) return;
+      done = true;
+      const url = new URL(location.href);
+      url.searchParams.set('v', Date.now());
+      location.replace(url.toString());
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', reload, { once: true });
+    setTimeout(reload, 3000); // safety net if the switch is slow
+    waiting.postMessage('SKIP_WAITING');
+  }, { capture: true });
   window.matchMedia('(display-mode: standalone)').addEventListener('change', updateInstallButtons);
   updateInstallButtons();
   openTabFromUrl();
