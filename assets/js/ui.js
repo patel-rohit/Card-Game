@@ -197,7 +197,7 @@ function renderPlayersList() {
         <input class="form-check-input chk-person-enabled" data-id="${escapeHtml(p.personId)}" type="checkbox" ${p.enabled ? 'checked' : ''}/>
       </div>
       <div class="flex-grow-1">
-        <strong>${escapeHtml(p.name)}</strong> <small class="text-muted players-pid">(${escapeHtml(p.personId)})</small>
+        <button type="button" class="rank-name btn-player-summary" data-id="${escapeHtml(p.personId)}" title="Show ${escapeHtml(p.name)}'s summary"><strong>${escapeHtml(p.name)}</strong> <small class="text-muted players-pid">(${escapeHtml(p.personId)})</small>${CHEVRON_SVG}</button>
         <div class="small text-muted">
           ${st.played} game${st.played === 1 ? "" : "s"} · total ${st.total}
           ${st.start ? ` · started with ${st.start}` : ''}
@@ -637,7 +637,9 @@ function renderHistoryCards(group, games, running) {
     const after = running[gm.gameId] || {};
     const chips = played.map(e => `
       <div class="score-chip${e.points === top && played.length > 1 ? ' win' : ''}">
-        <span class="nm">${e.points === top && played.length > 1 ? '👑 ' : ''}${escapeHtml(e.name)}</span>
+        ${group.people.some(p => p.personId === e.id)
+          ? `<button type="button" class="nm btn-player-summary" data-id="${escapeHtml(e.id)}" title="Show ${escapeHtml(e.name)}'s summary">`
+          : '<span class="nm">'}${e.points === top && played.length > 1 ? '👑 ' : ''}${escapeHtml(e.name)}${group.people.some(p => p.personId === e.id) ? '</button>' : '</span>'}
         <span class="vals"><span class="pts ${ptsClass(e.points)}">${signedPts(e.points)}</span><span class="run">score ${after[e.id] !== undefined ? after[e.id] : ''}</span></span>
       </div>`).join('');
     const foot = [
@@ -662,7 +664,7 @@ function renderHistoryTable(group, games, running, stats) {
   const hasStart = group.people.some(p => Number(p.startPoints));
   const table = document.createElement('table');
   table.className = 'table table-sm table-bordered table-hover history-table';
-  table.innerHTML = `<thead><tr><th>Game</th>${group.people.map(p => `<th>${escapeHtml(p.name)}</th>`).join('')}<th></th></tr></thead>`;
+  table.innerHTML = `<thead><tr><th>Game</th>${group.people.map(p => `<th><button type="button" class="th-name btn-player-summary" data-id="${escapeHtml(p.personId)}" title="Show ${escapeHtml(p.name)}'s summary">${escapeHtml(p.name)}</button></th>`).join('')}<th></th></tr></thead>`;
 
   const tbody = document.createElement('tbody');
   games.forEach(gm => {
@@ -960,14 +962,21 @@ btnCopyRanking.addEventListener('click', async () => {
   }
 });
 
+const CHEVRON_SVG = '<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
 function rankRow(r, rankLabel, hasStart, mode, muted = false) {
   const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
   const tr = document.createElement('tr');
   if (muted) tr.className = 'text-muted';
+  // players still in the group open their summary (summary.js); removed players stay plain text
+  const group = currentGroup();
+  const canOpen = !!group && group.people.some(p => p.personId === r.personId);
   const medal = medals[rankLabel] ? `<span class="rank-medal">${medals[rankLabel]}</span>` : rankLabel;
   tr.innerHTML = `
     <td>${medal}</td>
-    <td>${escapeHtml(r.name)} <small class="text-muted pid">(${escapeHtml(r.personId)})</small></td>
+    <td>${canOpen
+      ? `<button type="button" class="rank-name btn-player-summary" data-id="${escapeHtml(r.personId)}" title="Show ${escapeHtml(r.name)}'s summary">${escapeHtml(r.name)} <small class="text-muted pid">(${escapeHtml(r.personId)})</small>${CHEVRON_SVG}</button>`
+      : `${escapeHtml(r.name)} <small class="text-muted pid">(${escapeHtml(r.personId)})</small>`}</td>
     <td>${r.played}</td>
     ${hasStart ? `<td>${r.start || ''}</td>` : ''}
     <td${mode === 'total' ? ' class="sorted"' : ''}>${r.total}</td>
