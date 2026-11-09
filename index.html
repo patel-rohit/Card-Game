@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <!-- Bump app-version (and every ?v= in this file, and VERSION in sw.js) on every
        release so phones load the new files instead of an old cached copy. -->
-  <meta name="app-version" content="2026.11.09-3" />
+  <meta name="app-version" content="2026.11.09-4" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -17,10 +17,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="application-name" content="Points Game" />
   <meta name="description" content="Score keeper for card nights: log points, rankings by total or average, history, player summaries and WhatsApp sharing. Works offline." />
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-3" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-3" />
-  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-3" />
-  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-3" />
+  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-4" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-4" />
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-4" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-4" />
   <title>Points Game</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -444,6 +444,79 @@
     @media (min-width: 768px) { #modalLeaders .modal-dialog { max-width: 600px; } }
     @media (max-width: 767.98px) { #pane-log.has-leader { padding-bottom: 125px; } }
 
+    /* ---------- Partner + bid (Fill points only suggests; Save stores what is shown) ---------- */
+    .player-tile .role-row { display: none; position: relative; z-index: 1; gap: .3rem; margin-top: .4rem; }
+    .player-tile.selected .role-row { display: flex; }
+    .player-tile .role-row .btn-leader { flex: 1 1 0; min-width: 0; width: auto; margin-top: 0; padding: 0 .2rem; }
+    .player-tile .btn-partner {
+      flex: 1 1 0; min-width: 0; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: .25rem;
+      border-radius: .55rem; border: 1px dashed #b9b4a0; background: transparent; color: #5b5440; font-size: .78rem; font-weight: 600; padding: 0 .2rem;
+    }
+    .player-tile .role-row .btn-leader span, .player-tile .btn-partner span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-tile .role-row .btn-leader { font-size: .78rem; }
+    .player-tile .role-row svg { display: none; } /* text only: two buttons share a narrow card */
+    .player-tile .btn-partner:hover:not(:disabled) { border-color: #2f6f9f; color: #1d3f5c; }
+    .player-tile .btn-partner:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .player-tile .btn-partner:disabled { opacity: .35; cursor: not-allowed; }
+    .player-tile.partner .btn-partner { border: 1px solid #2f6f9f; color: #fff; background: linear-gradient(180deg, #4f8fc0, #2f6f9f); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+    .player-tile.partner.selected:not(.leader) { border-color: #2f6f9f; box-shadow: 0 10px 18px rgba(0,0,0,.45), 0 0 0 3px rgba(79,143,192,.55); }
+    .leader-panel { flex-wrap: wrap; row-gap: .45rem; }
+    .leader-panel .lp-bid { display: flex; align-items: center; gap: .35rem; flex: 0 0 auto; }
+    .leader-panel .lp-bid-lbl { font-size: .85rem; font-weight: 600; color: var(--gold); margin: 0; }
+    .leader-panel #inpBid { width: 6.5rem; min-height: 40px; font-variant-numeric: tabular-nums; background-color: #06301f; }
+    .leader-panel #inpBid.need { border-color: #ffb74d; box-shadow: 0 0 0 3px rgba(255,183,77,.45); }
+    .leader-panel #btnFillPoints { min-height: 40px; white-space: nowrap; border-radius: .6rem; padding: 0 .8rem; }
+    .player-tile .inp-pts.just-filled { animation: filled 1.5s ease-out; }
+    @keyframes filled { 0%, 30% { background: #fff3c4; box-shadow: 0 0 0 .2rem rgba(212,175,55,.55); } 100% { background: #fff; box-shadow: none; } }
+    .score-chip.partner { flex-wrap: wrap; row-gap: .2rem; }
+    .partner-pill { display: inline-flex; align-items: center; font-size: .66rem; font-weight: 700; line-height: 1; padding: .18rem .4rem; border-radius: 999px; white-space: nowrap; background: #dcebf7; color: #1d3f5c; border: 1px solid #9cc1de; }
+    .partner-badge { display: inline-block; font-size: .62rem; font-weight: 800; line-height: 1; padding: .14rem .3rem; border-radius: .3rem; vertical-align: 1px; color: #fff; background: #2f6f9f; cursor: help; }
+    /* scoring rules dialog */
+    .sr-intro { font-size: .88rem; margin-bottom: .7rem; }
+    .sr-grid { width: 100%; border-collapse: separate; border-spacing: .35rem; margin: 0 -.35rem; width: calc(100% + .7rem); }
+    .sr-grid th { font-size: .8rem; font-weight: 600; color: var(--gold); text-align: center; }
+    .sr-grid th[scope=row] { text-align: left; width: 3.4rem; color: var(--felt-ink); }
+    .sr-grid .sr-won th[scope=row] { color: #6be39b; } .sr-grid .sr-lost th[scope=row] { color: #ff8a80; }
+    .sr-grid .form-control { text-align: center; min-height: 42px; font-variant-numeric: tabular-nums; }
+    .sr-help { font-size: .76rem; color: var(--muted); margin: .25rem 0 .7rem; }
+    .sr-example { background: rgba(0,0,0,.25); border: 1px solid rgba(212,175,55,.35); border-radius: .8rem; padding: .55rem .7rem; font-size: .86rem; display: flex; flex-direction: column; gap: .3rem; }
+    .sr-example .sr-ex-head { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .sr-example b { color: #fff; font-variant-numeric: tabular-nums; }
+    .sr-tag { display: inline-block; min-width: 2.9rem; text-align: center; font-size: .7rem; font-weight: 800; border-radius: 999px; padding: .1rem .4rem; margin-right: .25rem; }
+    .sr-tag.won { background: #1b8a4b; color: #fff; } .sr-tag.lost { background: #c62828; color: #fff; }
+    .sr-bad { color: #ffc27a; font-size: .8rem; }
+    @media (min-width: 768px) { #modalScoring .modal-dialog { max-width: 480px; } }
+    /* ranking "As Leader" */
+    .lead-tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .lead-tiles .hist-stat .sub { font-size: .8rem; color: var(--felt-ink); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lead-tiles .lt-best { border-color: rgba(212,175,55,.75); background: linear-gradient(180deg, rgba(212,175,55,.18), rgba(0,0,0,.25)); }
+    .lead-tiles .lt-tough .val { color: #ffc27a; }
+    .leader-rank-table td, .leader-rank-table th { white-space: nowrap; }
+    .leader-rank-table td.lr-name { white-space: normal; }
+    .lr5 { display: inline-flex; gap: .2rem; vertical-align: middle; }
+    .lr5-chip { width: 1.35rem; height: 1.35rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 800; line-height: 1; }
+    .lr5-chip.won { background: #1b8a4b; color: #fff; }
+    .lr5-chip.lost { background: #c62828; color: #fff; }
+    .lr5-inline { margin-top: .15rem; }
+    .lr5-inline .lr5-chip { width: 1.1rem; height: 1.1rem; font-size: .58rem; }
+    .lr-removed { font-style: italic; }
+    .lead-empty { text-align: center; padding: 1.6rem 1rem; background: rgba(0,0,0,.22); border: 1px dashed rgba(212,175,55,.5); border-radius: 1rem; display: flex; flex-direction: column; align-items: center; gap: .7rem; }
+    .lead-empty .le-ico .lead-ico { width: 34px; height: 34px; color: var(--gold); }
+    .lead-empty .le-text { max-width: 26rem; font-size: .92rem; }
+    .lead-empty .btn { border-radius: 999px; }
+    @media (max-width: 767.98px) {
+      .leader-panel .lp-bid { order: 5; flex: 1 1 100%; }
+      .leader-panel #inpBid { flex: 1 1 0; width: 0; min-width: 0; }
+      #pane-log.has-leader { padding-bottom: 175px; }
+      .lead-tiles { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: .4rem; }
+      .lead-tiles .hist-stat { padding: .45rem .5rem; }
+      .lead-tiles .hist-stat .lbl { font-size: .62rem; letter-spacing: .03em; line-height: 1.2; min-height: 1.5em; }
+      .lead-tiles .hist-stat .val { font-size: 1rem; }
+      .lead-tiles .hist-stat .sub { font-size: .72rem; white-space: normal; line-height: 1.25; }
+      .leader-rank-table { font-size: .9rem; }
+      .leader-rank-table td, .leader-rank-table th { padding-left: .35rem; padding-right: .35rem; }
+    }
+
     @media (max-width: 767.98px) {
       .main-card { background: transparent; box-shadow: none; margin: 0; }
       #mainTabs { background: rgba(4,32,20,.97); border-top: 2px solid rgba(212,175,55,.5); }
@@ -459,7 +532,7 @@
   <header class="app-header py-2 mb-3">
     <div class="container">
       <div class="d-flex align-items-center gap-2">
-        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-3" class="app-logo" width="44" height="44" alt="">Points Game</div>
+        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-4" class="app-logo" width="44" height="44" alt="">Points Game</div>
         <select id="selCurrentGroup" class="form-select form-select-sm w-auto d-none d-md-block" aria-label="Current group"></select>
         <button id="btnInstall" type="button" class="btn btn-outline-primary btn-install d-none" title="Install Points Game on this device"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span>Install</span></button>
         <button id="btnAddGroup" class="btn btn-primary icon-btn" title="New group" aria-label="New group">+</button>
@@ -468,6 +541,7 @@
           <ul class="dropdown-menu dropdown-menu-end shadow-sm">
             <li><h6 class="dropdown-header">Current group</h6></li>
             <li><button class="dropdown-item py-2" id="btnRenameGroup">✏️ Rename group…</button></li>
+            <li><button class="dropdown-item py-2" id="btnScoringRules">🎯 Scoring rules…</button></li>
             <li><button class="dropdown-item py-2 text-danger" id="btnDeleteGroup">🗑️ Delete group…</button></li>
             <li><hr class="dropdown-divider"></li>
             <li><h6 class="dropdown-header">Backup</h6></li>
@@ -533,6 +607,11 @@
               <div class="sticky-save">
                 <div id="leaderPanel" class="leader-panel d-none" role="group" aria-label="Leader of this game">
                   <div class="lp-label"><svg class="lead-ico" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7z"/><rect x="5" y="19.2" width="14" height="2" rx="1"/></svg><span class="lp-need">Won or lost? · </span>Leader: <b id="lblLeaderName"></b></div>
+                  <div class="lp-bid" role="group" aria-label="Bid">
+                    <label class="lp-bid-lbl" for="inpBid">Bid</label>
+                    <input id="inpBid" type="text" inputmode="numeric" autocomplete="off" class="form-control form-control-sm" placeholder="e.g. 150" maxlength="6"/>
+                    <button type="button" id="btnFillPoints" class="btn btn-primary btn-sm" title="Suggest everyone's points from the bid and the group's scoring rules">Fill points</button>
+                  </div>
                   <div class="lp-seg" role="group" aria-label="Did the leader's team win or lose?">
                     <button type="button" class="lp-btn" data-result="won" aria-pressed="false">Won</button>
                     <button type="button" class="lp-btn" data-result="lost" aria-pressed="false">Lost</button>
@@ -542,7 +621,7 @@
                 <div class="d-flex align-items-center gap-2">
                   <button type="submit" id="btnSaveGame" class="btn btn-success">Save Game</button>
                   <div id="lblLogSummary" class="small text-muted"></div>
-                  <div class="ms-auto text-muted small d-none d-sm-block">Points range: -1000 to 1000</div>
+                  <div class="ms-auto text-muted small d-none d-sm-block">Points range: -10000 to 10000</div>
                 </div>
               </div>
             </form>
@@ -556,10 +635,16 @@
                 <label class="btn btn-outline-primary" for="rankModeTotal">By Total</label>
                 <input type="radio" class="btn-check" name="rankMode" id="rankModeAvg" value="average" autocomplete="off">
                 <label class="btn btn-outline-primary" for="rankModeAvg">By Average</label>
+                <input type="radio" class="btn-check" name="rankMode" id="rankModeLeader" value="leader" autocomplete="off">
+                <label class="btn btn-outline-primary" for="rankModeLeader">★ As Leader</label>
               </div>
               <div id="minGamesWrap" class="input-group input-group-sm" style="max-width: 190px">
                 <span class="input-group-text">Min games</span>
                 <input id="inpMinGames" type="number" min="1" class="form-control" value="1"/>
+              </div>
+              <div id="minLedWrap" class="input-group input-group-sm d-none" style="max-width: 190px">
+                <span class="input-group-text">Min games led</span>
+                <input id="inpMinLed" type="number" min="1" class="form-control" value="2"/>
               </div>
               <div class="ms-auto d-flex gap-2">
                 <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
@@ -568,6 +653,7 @@
               </div>
             </div>
             <div id="rankHint" class="small text-muted mb-2"></div>
+            <div id="rankLeaderTiles" class="hist-stats lead-tiles mb-3 d-none"></div>
             <div class="small text-muted mb-2 summary-hint">Tap a player to see their summary</div>
             <div id="rankTable" class="table-responsive-scroll"></div>
           </div>
@@ -782,6 +868,40 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalScoring" tabindex="-1" aria-hidden="true" aria-labelledby="lblScoringTitle">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <form id="formScoring" class="modal-content" novalidate autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title" id="lblScoringTitle">Scoring rules</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="sr-intro">Used by <b>Fill points</b> on Log Game for <b id="lblScoringGroup"></b>: points = <b>multiplier × bid</b>, rounded to whole points. They are only suggestions you can still change; saved games are never changed.</div>
+          <table class="sr-grid">
+            <thead><tr><th></th><th>Leader</th><th>Partners</th><th>Others</th></tr></thead>
+            <tbody>
+              <tr class="sr-won"><th scope="row">Won</th>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="won" data-role="leader" aria-label="Won: leader multiplier"></td>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="won" data-role="partner" aria-label="Won: partner multiplier"></td>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="won" data-role="other" aria-label="Won: others multiplier"></td></tr>
+              <tr class="sr-lost"><th scope="row">Lost</th>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="lost" data-role="leader" aria-label="Lost: leader multiplier"></td>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="lost" data-role="partner" aria-label="Lost: partner multiplier"></td>
+                <td><input type="number" inputmode="decimal" step="0.5" min="-10" max="10" class="form-control sr-inp" data-res="lost" data-role="other" aria-label="Lost: others multiplier"></td></tr>
+            </tbody>
+          </table>
+          <div class="sr-help">Multipliers from −10 to 10 in steps of 0.5 (e.g. 2 = double the bid, −1 = minus the bid).</div>
+          <div id="srExample" class="sr-example" aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btnScoringReset" class="btn btn-outline-secondary me-auto">Reset to default</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="btnScoringSave" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- libraries for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -790,13 +910,14 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js?v=2026.11.09-3"></script>
-  <script src="assets/js/models.js?v=2026.11.09-3"></script>
-  <script src="assets/js/ui.js?v=2026.11.09-3"></script>
-  <script src="assets/js/share.js?v=2026.11.09-3"></script>
-  <script src="assets/js/summary.js?v=2026.11.09-3"></script>
-  <script src="assets/js/leaders.js?v=2026.11.09-3"></script>
-  <script src="assets/js/pwa.js?v=2026.11.09-3"></script>
-  <script src="assets/js/main.js?v=2026.11.09-3"></script>
+  <script src="assets/js/storage.js?v=2026.11.09-4"></script>
+  <script src="assets/js/models.js?v=2026.11.09-4"></script>
+  <script src="assets/js/ui.js?v=2026.11.09-4"></script>
+  <script src="assets/js/bid.js?v=2026.11.09-4"></script>
+  <script src="assets/js/share.js?v=2026.11.09-4"></script>
+  <script src="assets/js/summary.js?v=2026.11.09-4"></script>
+  <script src="assets/js/leaders.js?v=2026.11.09-4"></script>
+  <script src="assets/js/pwa.js?v=2026.11.09-4"></script>
+  <script src="assets/js/main.js?v=2026.11.09-4"></script>
 </body>
 </html>

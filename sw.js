@@ -4,7 +4,7 @@
 
    Bump VERSION on every release (same value as <meta name="app-version"> in
    index.html) so phones pick up the new files. */
-const VERSION = '2026.11.09-3';
+const VERSION = '2026.11.09-4';
 const CACHE = 'points-game-' + VERSION;
 
 // Files needed to start the app offline. Same-origin files must all succeed.
@@ -18,6 +18,7 @@ const APP_FILES = [
   'assets/js/storage.js?v=' + VERSION,
   'assets/js/models.js?v=' + VERSION,
   'assets/js/ui.js?v=' + VERSION,
+  'assets/js/bid.js?v=' + VERSION,
   'assets/js/share.js?v=' + VERSION,
   'assets/js/summary.js?v=' + VERSION,
   'assets/js/leaders.js?v=' + VERSION,
