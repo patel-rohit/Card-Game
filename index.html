@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="color-scheme" content="dark" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <!-- Bump app-version (and the ?v= on the app scripts below) on every release so
-       phones load the new files instead of an old cached copy. -->
-  <meta name="app-version" content="2026.11.09-1" />
+  <!-- Bump app-version (and every ?v= in this file, and VERSION in sw.js) on every
+       release so phones load the new files instead of an old cached copy. -->
+  <meta name="app-version" content="2026.11.09-2" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -14,10 +14,13 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Points Game" />
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-1" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-1" />
-  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-1" />
-  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-1" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="application-name" content="Points Game" />
+  <meta name="description" content="Score keeper for card nights: log points, rankings by total or average, history, player summaries and WhatsApp sharing. Works offline." />
+  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-2" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-2" />
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-2" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-2" />
   <title>Points Game</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -223,6 +226,7 @@
     }
     .player-tile.selected .tick { background: var(--gold); border-color: var(--gold); color: #2a1d04; }
     .player-tile .form-control, .player-tile .btn-sign { background: #fff; color: #212529; border-color: #cfcfc6; }
+    .player-tile .form-control::placeholder { color: #8a8f94; }
     .player-tile .form-control:focus { background: #fff; color: #212529; border-color: var(--gold); box-shadow: 0 0 0 .2rem rgba(212,175,55,.3); }
     .player-tile .pname, .player-tile .pmeta, .player-tile .pts-wrap, .player-tile .tick { position: relative; z-index: 1; }
     .player-tile .tick { position: absolute; }
@@ -284,6 +288,16 @@
     .history-table td .run { display: block; font-size: .72rem; color: var(--muted); }
     .history-table td.win { background: rgba(212,175,55,.16) !important; }
     .history-table td .when { display: block; font-size: .72rem; color: var(--muted); }
+    /* install (PWA) */
+    .btn-install { display: inline-flex; align-items: center; gap: .35rem; height: 38px; border-radius: 999px; font-weight: 600; padding: 0 .85rem; }
+    .install-steps { padding-left: 1.2rem; margin-bottom: .8rem; }
+    .install-steps li { margin-bottom: .45rem; }
+    .install-steps svg { vertical-align: -3px; }
+    .install-note { font-size: .85rem; background: rgba(212,175,55,.12); border: 1px solid rgba(212,175,55,.45); border-radius: .7rem; padding: .6rem .75rem; }
+    @media (max-width: 380px) { .btn-install span { display: none; } .btn-install { width: 38px; padding: 0; justify-content: center; } }
+    /* installed app: respect the notch / status bar */
+    .is-standalone .app-header { padding-top: calc(.5rem + env(safe-area-inset-top, 0px)) !important; }
+
     /* refresh */
     .btn-refresh { white-space: nowrap; }
     .btn-refresh .ri { display: inline-block; font-weight: 700; }
@@ -366,8 +380,9 @@
   <header class="app-header py-2 mb-3">
     <div class="container">
       <div class="d-flex align-items-center gap-2">
-        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-1" class="app-logo" width="44" height="44" alt="">Points Game</div>
+        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-2" class="app-logo" width="44" height="44" alt="">Points Game</div>
         <select id="selCurrentGroup" class="form-select form-select-sm w-auto d-none d-md-block" aria-label="Current group"></select>
+        <button id="btnInstall" type="button" class="btn btn-outline-primary btn-install d-none" title="Install Points Game on this device"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span>Install</span></button>
         <button id="btnAddGroup" class="btn btn-primary icon-btn" title="New group" aria-label="New group">+</button>
         <div class="dropdown">
           <button class="btn btn-outline-secondary icon-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Menu" aria-label="Menu">⋮</button>
@@ -380,6 +395,7 @@
             <li><button class="dropdown-item py-2" id="btnExportJSON">⬇️ Download backup (.json)</button></li>
             <li><button class="dropdown-item py-2" id="btnImportJSON">⬆️ Restore from backup…</button></li>
             <li><hr class="dropdown-divider"></li>
+            <li id="menuInstallItem"><button class="dropdown-item py-2" id="btnInstallMenu">📲 Install app</button></li>
             <li><button class="dropdown-item py-2" id="btnCheckUpdate">🔄 Check for update</button></li>
             <li><span class="dropdown-item-text small text-muted" id="lblAppVersion"></span></li>
           </ul>
@@ -593,6 +609,46 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalInstall" tabindex="-1" aria-hidden="true" aria-labelledby="lblInstallTitle">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="lblInstallTitle">Install Points Game</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <img src="assets/img/logo-192.png" width="56" height="56" alt="" class="rounded-3">
+            <div class="small">Opens full screen from your home screen, works offline, and keeps your games on this device.</div>
+          </div>
+          <div id="installStepsIOS" class="d-none">
+            <ol class="install-steps">
+              <li>Tap the <b>Share</b> button <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share icon" role="img"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg> at the bottom of Safari.</li>
+              <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+              <li>Tap <b>Add</b>. Points Game appears on your home screen.</li>
+            </ol>
+            <div class="install-note">
+              <b>Keep your games:</b> on iPhone and iPad the installed app has its own storage, separate from Safari.
+              Before installing, open <b>⋮ → Download backup</b> here. Then, in the installed app, use <b>⋮ → Restore from backup</b>.
+              Your games in Safari stay untouched.
+            </div>
+          </div>
+          <div id="installStepsOther" class="d-none">
+            <ol class="install-steps">
+              <li>Open your browser menu (<b>⋮</b> in Chrome or Edge).</li>
+              <li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>
+              <li>Confirm. Your games come with it on this device.</li>
+            </ol>
+            <div class="small text-muted">If you don’t see the option, open this page in Chrome, Edge or Samsung Internet.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- libraries for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -601,11 +657,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js?v=2026.11.09-1"></script>
-  <script src="assets/js/models.js?v=2026.11.09-1"></script>
-  <script src="assets/js/ui.js?v=2026.11.09-1"></script>
-  <script src="assets/js/share.js?v=2026.11.09-1"></script>
-  <script src="assets/js/summary.js?v=2026.11.09-1"></script>
-  <script src="assets/js/main.js?v=2026.11.09-1"></script>
+  <script src="assets/js/storage.js?v=2026.11.09-2"></script>
+  <script src="assets/js/models.js?v=2026.11.09-2"></script>
+  <script src="assets/js/ui.js?v=2026.11.09-2"></script>
+  <script src="assets/js/share.js?v=2026.11.09-2"></script>
+  <script src="assets/js/summary.js?v=2026.11.09-2"></script>
+  <script src="assets/js/pwa.js?v=2026.11.09-2"></script>
+  <script src="assets/js/main.js?v=2026.11.09-2"></script>
 </body>
 </html>
