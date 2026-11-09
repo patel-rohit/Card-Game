@@ -152,6 +152,7 @@ function updatePerson(groupId, personId, patch) {
     // keep history linked to the renamed player
     g.games.forEach(gm => gm.entries.forEach(e => { if (e.personId === personId) e.personId = newId; }));
     g.games.forEach(gm => { if (gm.leader && gm.leader.personId === personId) gm.leader.personId = newId; });
+    g.games.forEach(gm => { if (Array.isArray(gm.partners)) gm.partners = gm.partners.map(id => (id === personId ? newId : id)); });
   }
   Object.assign(p, patch, { personId: newId });
   saveState(state);
@@ -169,7 +170,8 @@ function removePerson(groupId, personId) {
 /* games */
 // leader (optional): null = no leader in this game, or { personId, result: 'won'|'lost', source }.
 // It is only a note of who led; points are stored exactly as given.
-function addGame(groupId, entries, leader) {
+// partners (optional): ids of the leader's partners; stored only when there is at least one.
+function addGame(groupId, entries, leader, partners) {
   const state = loadState();
   const g = state.groups.find(x => x.groupId === groupId);
   if (!g) throw new Error('Group not found');
@@ -179,6 +181,7 @@ function addGame(groupId, entries, leader) {
     entries // [{ personId, participated, points }]
   };
   if (leader !== undefined) game.leader = leader;
+  if (Array.isArray(partners) && partners.length) game.partners = partners.slice();
   g.games.push(game);
   g.nextGameId++;
   saveState(state);
@@ -187,7 +190,8 @@ function addGame(groupId, entries, leader) {
 
 // Replace the entries of an existing game; its id and timestamp are kept.
 // leader: undefined leaves the game's leader as it is; null or an object replaces it.
-function updateGame(groupId, gameId, entries, leader) {
+// partners: undefined leaves them as they are; an array replaces them (empty removes the field).
+function updateGame(groupId, gameId, entries, leader, partners) {
   const state = loadState();
   const g = state.groups.find(x => x.groupId === groupId);
   if (!g) throw new Error('Group not found');
@@ -195,6 +199,10 @@ function updateGame(groupId, gameId, entries, leader) {
   if (!game) throw new Error('Game not found');
   game.entries = entries;
   if (leader !== undefined) game.leader = leader;
+  if (Array.isArray(partners)) {
+    if (partners.length) game.partners = partners.slice();
+    else delete game.partners;
+  }
   game.editedAt = new Date().toISOString();
   saveState(state);
   return game;
@@ -244,6 +252,28 @@ function setGameLeaders(groupId, leaders) {
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   return count;
+}
+
+// Save a group's scoring rules for "Fill points". Works on the saved data as it is
+// (no defaults filled in), so nothing but `group.scoring` changes.
+function setGroupScoring(groupId, scoring) {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) throw new Error('No saved data');
+  const data = JSON.parse(raw);
+  const g = (data.groups || []).find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  const clean = {};
+  ['won', 'lost'].forEach(res => {
+    clean[res] = {};
+    ['leader', 'partner', 'other'].forEach(role => {
+      const v = Number(scoring && scoring[res] && scoring[res][role]);
+      if (!Number.isFinite(v)) throw new Error('Every rule needs a number');
+      clean[res][role] = v;
+    });
+  });
+  g.scoring = clean;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return clean;
 }
 
 /* utility */

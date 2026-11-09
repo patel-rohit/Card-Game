@@ -18,6 +18,13 @@ function buildShareData() {
   if (!group) return null;
   const mode = getRankMode();
   const minGames = Math.max(1, Number(state.ui && state.ui.rankMinGames) || 1);
+  const lastGame = buildLastGame(group);
+  if (mode === 'leader') {
+    // "As Leader" ranking: same order and ranks as the Ranking tab
+    const lr = computeLeaderRanking(group, getRankMinLed());
+    const rows = lr.ranked.map(r => ({ rank: r.rank, name: r.name, led: r.led, won: r.won, lost: r.lost, pct: r.pct }));
+    return { groupName: group.name, mode, minLed: lr.minLed, gamesCount: group.games.length, gamesWithLeader: lr.gamesWithLeader, rows, lastGame };
+  }
   const arr = Object.values(computeTotalsAndAverages(group));
 
   let ranked;
@@ -35,7 +42,11 @@ function buildShareData() {
     return { rank, name: r.name, played: r.played, total: r.total, average: r.average };
   });
 
-  // newest game, highest score first
+  return { groupName: group.name, mode, minGames, gamesCount: group.games.length, rows, lastGame };
+}
+
+// newest game, highest score first
+function buildLastGame(group) {
   let lastGame = null;
   if (group.games.length) {
     const g = group.games.reduce((a, b) => (Number(b.gameId) > Number(a.gameId) ? b : a));
@@ -49,9 +60,10 @@ function buildShareData() {
         .sort((a, b) => b.points - a.points)
     };
   }
-
-  return { groupName: group.name, mode, minGames, gamesCount: group.games.length, rows, lastGame };
+  return lastGame;
 }
+
+function leaderPct(row) { return Math.round(row.pct * 100) + '%'; }
 
 function fmtValue(row, mode) {
   return mode === 'average' ? `${row.average.toFixed(2)} avg` : `${row.total} pts`;
@@ -66,13 +78,23 @@ function appUrl() {
 // WhatsApp formatting: *bold*, _italic_
 function buildShareText(d) {
   const lines = [];
-  lines.push(`🃏 *${d.groupName}* — standings`);
-  lines.push(`_After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · by ${d.mode === 'average' ? 'average' : 'total'}_`);
-  lines.push('');
-  d.rows.forEach(r => {
-    const badge = r.rank <= 3 ? MEDALS[r.rank - 1] : `${r.rank}.`;
-    lines.push(`${badge} ${r.name} — *${fmtValue(r, d.mode)}* (${r.played} game${r.played === 1 ? '' : 's'})`);
-  });
+  if (d.mode === 'leader') {
+    lines.push(`★ *${d.groupName}* — leader ranking`);
+    lines.push(`_${d.gamesWithLeader} game${d.gamesWithLeader === 1 ? '' : 's'} with a leader · by win % (min ${d.minLed} led)_`);
+    lines.push('');
+    d.rows.forEach(r => {
+      const badge = r.rank <= 3 ? MEDALS[r.rank - 1] : `${r.rank}.`;
+      lines.push(`${badge} ${r.name} — *${leaderPct(r)}* (${r.won}–${r.lost} as leader)`);
+    });
+  } else {
+    lines.push(`🃏 *${d.groupName}* — standings`);
+    lines.push(`_After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · by ${d.mode === 'average' ? 'average' : 'total'}_`);
+    lines.push('');
+    d.rows.forEach(r => {
+      const badge = r.rank <= 3 ? MEDALS[r.rank - 1] : `${r.rank}.`;
+      lines.push(`${badge} ${r.name} — *${fmtValue(r, d.mode)}* (${r.played} game${r.played === 1 ? '' : 's'})`);
+    });
+  }
   if (d.lastGame && d.lastGame.entries.length) {
     lines.push('');
     lines.push(`*Last game #${d.lastGame.gameId}:* ` + d.lastGame.entries.map(e => `${e.name} ${signed(e.points)}`).join(', ')
@@ -151,7 +173,9 @@ async function drawShareImage(d) {
   ctx.fillStyle = '#ffffff'; ctx.font = `700 64px ${serif}`;
   ctx.fillText(fitText(ctx, d.groupName, W - PAD * 2), W / 2, 215);
   ctx.fillStyle = 'rgba(232,243,236,.8)'; ctx.font = `400 32px ${sans}`;
-  ctx.fillText(`After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · ranked by ${d.mode === 'average' ? 'average' : 'total'}`, W / 2, 270);
+  ctx.fillText(d.mode === 'leader'
+    ? `★ Leader ranking · ${d.gamesWithLeader} game${d.gamesWithLeader === 1 ? '' : 's'} with a leader`
+    : `After ${d.gamesCount} game${d.gamesCount === 1 ? '' : 's'} · ranked by ${d.mode === 'average' ? 'average' : 'total'}`, W / 2, 270);
 
   // standings as playing cards
   let y = 320;
@@ -179,15 +203,17 @@ async function drawShareImage(d) {
     ctx.textAlign = 'left'; ctx.fillStyle = '#1d1d1f'; ctx.font = `700 42px ${sans}`;
     ctx.fillText(fitText(ctx, r.name, 520), PAD + 120, mid - 8);
     ctx.fillStyle = '#6b6f73'; ctx.font = `400 26px ${sans}`;
-    ctx.fillText(`${r.played} game${r.played === 1 ? '' : 's'}`, PAD + 120, mid + 24);
+    ctx.fillText(d.mode === 'leader'
+      ? `led ${r.led} game${r.led === 1 ? '' : 's'} · ${r.won}–${r.lost} (W–L)`
+      : `${r.played} game${r.played === 1 ? '' : 's'}`, PAD + 120, mid + 24);
 
     ctx.textAlign = 'right';
-    const val = d.mode === 'average' ? r.average.toFixed(2) : String(r.total);
-    const neg = (d.mode === 'average' ? r.average : r.total) < 0;
+    const val = d.mode === 'leader' ? leaderPct(r) : d.mode === 'average' ? r.average.toFixed(2) : String(r.total);
+    const neg = d.mode !== 'leader' && (d.mode === 'average' ? r.average : r.total) < 0;
     ctx.fillStyle = neg ? '#c62828' : (top3 ? '#9a7614' : '#1d1d1f'); ctx.font = `800 48px ${sans}`;
     ctx.fillText(val, W - PAD - 34, mid);
     ctx.fillStyle = '#8a8f94'; ctx.font = `400 22px ${sans}`;
-    ctx.fillText(d.mode === 'average' ? 'avg' : 'pts', W - PAD - 34, mid + 26);
+    ctx.fillText(d.mode === 'leader' ? 'won' : d.mode === 'average' ? 'avg' : 'pts', W - PAD - 34, mid + 26);
     y += ROW_H + GAP;
   });
 
@@ -223,7 +249,10 @@ let shareCache = null; // { text, file, dataUrl }
 async function openShareDialog() {
   const d = buildShareData();
   if (!d) { alert('Create a group first'); return; }
-  if (!d.rows.length) { alert('Nothing to share yet: no player has enough games.'); return; }
+  if (!d.rows.length) {
+    alert(d.mode === 'leader' ? 'Nothing to share yet: no player has led enough games.' : 'Nothing to share yet: no player has enough games.');
+    return;
+  }
   const text = buildShareText(d);
   shareCache = { text, file: null, dataUrl: '' };
   imgSharePreview.removeAttribute('src');
@@ -231,7 +260,7 @@ async function openShareDialog() {
   modalShare.show();
   // image is prepared now so the Share tap can open the share sheet straight away
   const { blob, dataUrl } = await drawShareImage(d);
-  const fileName = `${d.groupName.replace(/[^\w-]+/g, '_')}_standings.png`;
+  const fileName = `${d.groupName.replace(/[^\w-]+/g, '_')}_${d.mode === 'leader' ? 'leader_ranking' : 'standings'}.png`;
   shareCache.file = new File([blob], fileName, { type: 'image/png' });
   shareCache.dataUrl = dataUrl;
   imgSharePreview.src = dataUrl;
