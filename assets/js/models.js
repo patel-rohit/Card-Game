@@ -69,3 +69,43 @@ function computeRunningTotals(group) {
   });
   return out;
 }
+
+// Suggest who led an old game, from the saved points only (nothing is changed).
+// Rules: one player above 500 -> that player won; else one player below 0 -> that player lost;
+// else no leader. Several candidates -> the most extreme one is suggested and marked unclear.
+// returns { personId: string|null, result: 'won'|'lost'|null, unclear: boolean }
+function suggestLeader(game, nameOf = id => id) {
+  const played = (game.entries || []).filter(e => e.participated)
+    .map(e => ({ personId: e.personId, points: Number(e.points) || 0 }));
+  const byName = (a, b) => String(nameOf(a.personId)).localeCompare(String(nameOf(b.personId)));
+  const big = played.filter(e => e.points > 500);
+  if (big.length) {
+    const pick = big.slice().sort((a, b) => (b.points - a.points) || byName(a, b))[0];
+    return { personId: pick.personId, result: 'won', unclear: big.length > 1 };
+  }
+  const neg = played.filter(e => e.points < 0);
+  if (neg.length) {
+    const pick = neg.slice().sort((a, b) => (a.points - b.points) || byName(a, b))[0];
+    return { personId: pick.personId, result: 'lost', unclear: neg.length > 1 };
+  }
+  return { personId: null, result: null, unclear: false };
+}
+
+// The game's leader when one is recorded, else null (no leader / not reviewed yet).
+function gameLeader(game) {
+  const l = game && game.leader;
+  return l && typeof l === 'object' && l.personId && (l.result === 'won' || l.result === 'lost') ? l : null;
+}
+
+// Games each player led: { personId -> { led, won, lost } } (only games with a recorded leader).
+function computeLeaderStats(group) {
+  const out = {};
+  group.games.forEach(g => {
+    const l = gameLeader(g);
+    if (!l) return;
+    const s = out[l.personId] || (out[l.personId] = { led: 0, won: 0, lost: 0 });
+    s.led++;
+    if (l.result === 'won') s.won++; else s.lost++;
+  });
+  return out;
+}

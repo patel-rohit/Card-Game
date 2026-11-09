@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <!-- Bump app-version (and every ?v= in this file, and VERSION in sw.js) on every
        release so phones load the new files instead of an old cached copy. -->
-  <meta name="app-version" content="2026.11.09-2" />
+  <meta name="app-version" content="2026.11.09-3" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -17,10 +17,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="application-name" content="Points Game" />
   <meta name="description" content="Score keeper for card nights: log points, rankings by total or average, history, player summaries and WhatsApp sharing. Works offline." />
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-2" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-2" />
-  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-2" />
-  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-2" />
+  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg?v=2026.11.09-3" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/img/logo-192.png?v=2026.11.09-3" />
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=2026.11.09-3" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.11.09-3" />
   <title>Points Game</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -365,6 +365,85 @@
     #modalSummary .ps-foot .btn-outline-secondary { flex: 0 0 110px; }
     @media (min-width: 768px) { #modalSummary .modal-dialog { max-width: 520px; } }
 
+    /* ---------- Leader of a game (only recorded; points are never changed) ---------- */
+    .player-tile .btn-leader {
+      display: none; position: relative; z-index: 1; width: 100%; min-height: 40px; margin-top: .4rem;
+      align-items: center; justify-content: center; gap: .35rem; border-radius: .55rem;
+      border: 1px dashed #b9b4a0; background: transparent; color: #5b5440; font-size: .82rem; font-weight: 600;
+    }
+    .player-tile.selected .btn-leader { display: inline-flex; }
+    .player-tile .btn-leader:hover { border-color: var(--gold); color: #2a1d04; }
+    .player-tile .btn-leader:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .player-tile .btn-leader .lead-ico { opacity: .65; }
+    .player-tile.leader .btn-leader { border: 1px solid #a8841f; color: #2a1d04; background: linear-gradient(180deg, #f6e08f, #d4af37); box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+    .player-tile.leader .btn-leader .lead-ico { opacity: 1; }
+    .player-tile .leader-ribbon { display: none; }
+    .player-tile.leader { padding-top: 1.15rem; }
+    /* keep the card face from scrolling inside the tile when the Leader button gets focus */
+    .player-tile.selected { overflow: clip; }
+    .player-tile.leader.selected { border-color: #a8841f; box-shadow: 0 10px 18px rgba(0,0,0,.45), 0 0 0 3px rgba(212,175,55,.75); }
+    .player-tile.leader .leader-ribbon {
+      display: block; position: absolute; z-index: 2; top: 0; left: 50%; transform: translateX(-50%);
+      background: #063a25; color: var(--gold); font-size: .6rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+      padding: .1rem .55rem .12rem; border-radius: 0 0 .45rem .45rem; line-height: 1.2; white-space: nowrap;
+    }
+    .leader-panel { display: flex; align-items: center; gap: .5rem; padding: 0 0 .5rem; margin-bottom: .5rem; border-bottom: 1px solid rgba(212,175,55,.3); }
+    .leader-panel.d-none { display: none !important; }
+    .leader-panel .lp-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .9rem; color: var(--felt-ink); }
+    .leader-panel .lp-label .lead-ico { color: var(--gold); vertical-align: -2px; margin-right: .25rem; }
+    .leader-panel .lp-label b { color: var(--gold); }
+    .leader-panel .lp-seg { display: inline-flex; border: 1px solid rgba(255,255,255,.3); border-radius: .6rem; overflow: hidden; flex: 0 0 auto; }
+    .leader-panel .lp-btn { min-height: 40px; min-width: 64px; padding: 0 .8rem; border: 0; background: rgba(0,0,0,.25); color: var(--felt-ink); font-weight: 600; font-size: .9rem; }
+    .leader-panel .lp-btn + .lp-btn { border-left: 1px solid rgba(255,255,255,.3); }
+    .leader-panel .lp-btn.active[data-result="won"] { background: #1b8a4b; color: #fff; }
+    .leader-panel .lp-btn.active[data-result="lost"] { background: #c62828; color: #fff; }
+    .leader-panel .lp-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .leader-panel .lp-clear { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: transparent; color: var(--muted); padding: 0; font-size: 1.1rem; line-height: 1; }
+    .leader-panel.need .lp-seg { border-color: #ffb74d; box-shadow: 0 0 0 3px rgba(255,183,77,.45); }
+    .leader-panel .lp-need { display: none; }
+    .leader-panel.need .lp-need { display: inline; color: #ffc27a; }
+    /* History */
+    .score-chip.lead { flex-wrap: wrap; row-gap: .2rem; }
+    .score-chip .lead-line { flex: 0 0 100%; display: flex; }
+    .lead-pill { display: inline-flex; align-items: center; gap: .2rem; font-size: .66rem; font-weight: 700; line-height: 1; padding: .18rem .4rem; border-radius: 999px; white-space: nowrap; }
+    .lead-pill .lead-ico { width: 11px; height: 11px; }
+    .lead-pill.won { background: #d3f5df; color: #145c33; border: 1px solid #8fd6aa; }
+    .lead-pill.lost { background: #ffe0dc; color: #8e1b1b; border: 1px solid #f2a39b; }
+    .score-chip.lead { border-color: #b9b4a0; }
+    .lead-badge { display: inline-block; font-size: .62rem; font-weight: 800; line-height: 1; padding: .14rem .3rem; border-radius: .3rem; vertical-align: 1px; color: #fff; cursor: help; }
+    .lead-badge.won { background: #1b8a4b; } .lead-badge.lost { background: #c62828; }
+    /* review of old games */
+    .leader-banner { display: flex; align-items: center; gap: .5rem; padding: .45rem .5rem .45rem .7rem; margin-bottom: .6rem; border-radius: .8rem; background: rgba(212,175,55,.14); border: 1px solid rgba(212,175,55,.5); font-size: .88rem; }
+    .leader-banner.d-none { display: none !important; }
+    .leader-banner .lead-ico { color: var(--gold); flex: 0 0 auto; }
+    .leader-banner .lb-text { flex: 1; min-width: 0; }
+    .leader-banner .btn { flex: 0 0 auto; border-radius: 999px; min-height: 34px; }
+    .leader-banner .btn-close { flex: 0 0 auto; padding: .6rem; }
+    .lr-intro { font-size: .9rem; margin-bottom: .5rem; }
+    .lr-rules { font-size: .8rem; color: var(--muted); background: rgba(0,0,0,.22); border-radius: .7rem; padding: .5rem .65rem; margin-bottom: .6rem; }
+    .lr-rules ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+    .lr-check { display: inline-block; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .15rem .45rem; border-radius: 999px; background: #ffb74d; color: #3b2300; vertical-align: 1px; }
+    .lr-row { background: var(--card); color: var(--card-ink); border-radius: .8rem; padding: .55rem .65rem; margin-bottom: .5rem; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+    .lr-row.unclear { box-shadow: 0 0 0 2px #ffb74d, 0 2px 6px rgba(0,0,0,.3); }
+    .lr-head { display: flex; align-items: center; gap: .4rem; font-size: .88rem; }
+    .lr-head .lr-no { font-family: 'Cinzel', Georgia, serif; font-weight: 700; background: #063a25; color: var(--gold); border-radius: .4rem; padding: .05rem .4rem; font-size: .8rem; }
+    .lr-head .lr-date { color: #5f6368; }
+    .lr-head .lr-check { margin-left: auto; }
+    .lr-pts { font-size: .76rem; color: #4a4f54; margin: .25rem 0 .4rem; line-height: 1.35; }
+    .lr-pts .pos { color: #1b8a4b; font-weight: 600; } .lr-pts .neg { color: #c62828; font-weight: 600; }
+    .lr-ctrls { display: flex; gap: .4rem; }
+    .lr-ctrls .form-select { background-color: #fff; color: #212529; border-color: #cfcfc6; min-height: 40px; }
+    .lr-ctrls .form-select:disabled { background-color: #eceae2; color: #8a8f94; }
+    .lr-ctrls .lr-leader { flex: 1 1 auto; min-width: 0; }
+    .lr-ctrls .lr-result { flex: 0 0 7.2rem; }
+    .lr-ctrls .form-select.need { border-color: #e65100; box-shadow: 0 0 0 .2rem rgba(230,81,0,.3); }
+    #modalLeaders .modal-footer .btn { min-height: 42px; }
+    .ps-led { display: flex; align-items: center; justify-content: center; gap: .4rem; font-size: .85rem; color: var(--felt-ink); margin-top: -.35rem; }
+    .ps-led .lead-ico { color: var(--gold); }
+    .ps-led b { color: var(--gold); }
+    @media (min-width: 768px) { #modalLeaders .modal-dialog { max-width: 600px; } }
+    @media (max-width: 767.98px) { #pane-log.has-leader { padding-bottom: 125px; } }
+
     @media (max-width: 767.98px) {
       .main-card { background: transparent; box-shadow: none; margin: 0; }
       #mainTabs { background: rgba(4,32,20,.97); border-top: 2px solid rgba(212,175,55,.5); }
@@ -380,7 +459,7 @@
   <header class="app-header py-2 mb-3">
     <div class="container">
       <div class="d-flex align-items-center gap-2">
-        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-2" class="app-logo" width="44" height="44" alt="">Points Game</div>
+        <div class="app-title me-auto d-flex align-items-center gap-2"><img src="assets/img/logo.svg?v=2026.11.09-3" class="app-logo" width="44" height="44" alt="">Points Game</div>
         <select id="selCurrentGroup" class="form-select form-select-sm w-auto d-none d-md-block" aria-label="Current group"></select>
         <button id="btnInstall" type="button" class="btn btn-outline-primary btn-install d-none" title="Install Points Game on this device"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 19h14"/></svg><span>Install</span></button>
         <button id="btnAddGroup" class="btn btn-primary icon-btn" title="New group" aria-label="New group">+</button>
@@ -397,6 +476,7 @@
             <li><hr class="dropdown-divider"></li>
             <li id="menuInstallItem"><button class="dropdown-item py-2" id="btnInstallMenu">📲 Install app</button></li>
             <li><button class="dropdown-item py-2" id="btnCheckUpdate">🔄 Check for update</button></li>
+            <li><button class="dropdown-item py-2" id="btnHardRefresh">♻️ Hard refresh (reload app files)</button></li>
             <li><span class="dropdown-item-text small text-muted" id="lblAppVersion"></span></li>
           </ul>
           <input id="fileImportJSON" type="file" accept="application/json,.json" class="d-none"/>
@@ -437,6 +517,12 @@
                 <button type="button" class="btn btn-sm btn-outline-secondary btn-refresh" title="Refresh data" aria-label="Refresh data"><span class="ri">↻</span><span class="d-none d-sm-inline"> Refresh</span></button>
               </div>
             </div>
+            <div class="leader-banner d-none" role="status">
+              <svg class="lead-ico" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7z"/><rect x="5" y="19.2" width="14" height="2" rx="1"/></svg>
+              <span class="lb-text"><b class="lb-count"></b> <span class="lb-words">old games have no leader yet</span></span>
+              <button type="button" class="btn btn-sm btn-primary btn-leader-review">Review</button>
+              <button type="button" class="btn-close btn-close-white btn-leader-banner-close" aria-label="Hide this message"></button>
+            </div>
             <div id="editBanner" class="alert alert-warning py-2 d-flex align-items-center gap-2 d-none">
               <div>Editing <b id="lblEditGame"></b>. Change players or points, then save.</div>
               <button type="button" id="btnCancelEdit" class="btn btn-sm btn-outline-dark ms-auto">Cancel edit</button>
@@ -444,10 +530,20 @@
             <div class="small text-muted mb-2">Tap a player to include them, then enter their points.<span class="d-none d-md-inline"> Press <kbd>Enter</kbd> to jump to the next player.</span></div>
             <form id="formLogGame" autocomplete="off">
               <div id="logPlayersContainer"></div>
-              <div class="sticky-save d-flex align-items-center gap-2">
-                <button type="submit" id="btnSaveGame" class="btn btn-success">Save Game</button>
-                <div id="lblLogSummary" class="small text-muted"></div>
-                <div class="ms-auto text-muted small d-none d-sm-block">Points range: -1000 to 1000</div>
+              <div class="sticky-save">
+                <div id="leaderPanel" class="leader-panel d-none" role="group" aria-label="Leader of this game">
+                  <div class="lp-label"><svg class="lead-ico" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7z"/><rect x="5" y="19.2" width="14" height="2" rx="1"/></svg><span class="lp-need">Won or lost? · </span>Leader: <b id="lblLeaderName"></b></div>
+                  <div class="lp-seg" role="group" aria-label="Did the leader's team win or lose?">
+                    <button type="button" class="lp-btn" data-result="won" aria-pressed="false">Won</button>
+                    <button type="button" class="lp-btn" data-result="lost" aria-pressed="false">Lost</button>
+                  </div>
+                  <button type="button" id="btnLeaderClear" class="lp-clear" title="No leader in this game" aria-label="Remove leader">✕</button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <button type="submit" id="btnSaveGame" class="btn btn-success">Save Game</button>
+                  <div id="lblLogSummary" class="small text-muted"></div>
+                  <div class="ms-auto text-muted small d-none d-sm-block">Points range: -1000 to 1000</div>
+                </div>
               </div>
             </form>
           </div>
@@ -478,6 +574,12 @@
 
           <!-- History -->
           <div class="tab-pane fade" id="pane-history">
+            <div class="leader-banner d-none" role="status">
+              <svg class="lead-ico" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7z"/><rect x="5" y="19.2" width="14" height="2" rx="1"/></svg>
+              <span class="lb-text"><b class="lb-count"></b> <span class="lb-words">old games have no leader yet</span></span>
+              <button type="button" class="btn btn-sm btn-primary btn-leader-review">Review</button>
+              <button type="button" class="btn-close btn-close-white btn-leader-banner-close" aria-label="Hide this message"></button>
+            </div>
             <div id="historyStats" class="hist-stats mb-3"></div>
             <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
               <div class="btn-group btn-group-sm" role="group" aria-label="History view">
@@ -649,6 +751,37 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalLeaders" tabindex="-1" aria-hidden="true" aria-labelledby="lblLeadersTitle">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="lblLeadersTitle">Mark leaders in old games</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="lr-intro">The app now notes each game's <b>leader</b> and whether the leader's team <b>won or lost</b>. Please check the suggestions below. <b>Points are never changed.</b></div>
+          <div class="lr-rules">Suggested from the saved points:
+            <ul>
+              <li>a player above 500 → that player led and <b>won</b></li>
+              <li>otherwise one player below 0 → that player led and <b>lost</b></li>
+              <li>otherwise → no leader</li>
+            </ul>
+            <span class="lr-check">Check</span> = more than one player fits, please pick the right one.
+          </div>
+          <div class="form-check form-switch mb-2" id="leadersFilterWrap">
+            <input class="form-check-input" type="checkbox" id="chkLeadersOnlyCheck">
+            <label class="form-check-label small" for="chkLeadersOnlyCheck">Show only games to check (<span id="lblLeadersCheckCount">0</span>)</label>
+          </div>
+          <div id="leaderReviewList"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btnLeadersLater" class="btn btn-outline-secondary">Later</button>
+          <button type="button" id="btnLeadersSave" class="btn btn-primary">Save leaders</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- libraries for PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -657,12 +790,13 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- app scripts -->
-  <script src="assets/js/storage.js?v=2026.11.09-2"></script>
-  <script src="assets/js/models.js?v=2026.11.09-2"></script>
-  <script src="assets/js/ui.js?v=2026.11.09-2"></script>
-  <script src="assets/js/share.js?v=2026.11.09-2"></script>
-  <script src="assets/js/summary.js?v=2026.11.09-2"></script>
-  <script src="assets/js/pwa.js?v=2026.11.09-2"></script>
-  <script src="assets/js/main.js?v=2026.11.09-2"></script>
+  <script src="assets/js/storage.js?v=2026.11.09-3"></script>
+  <script src="assets/js/models.js?v=2026.11.09-3"></script>
+  <script src="assets/js/ui.js?v=2026.11.09-3"></script>
+  <script src="assets/js/share.js?v=2026.11.09-3"></script>
+  <script src="assets/js/summary.js?v=2026.11.09-3"></script>
+  <script src="assets/js/leaders.js?v=2026.11.09-3"></script>
+  <script src="assets/js/pwa.js?v=2026.11.09-3"></script>
+  <script src="assets/js/main.js?v=2026.11.09-3"></script>
 </body>
 </html>

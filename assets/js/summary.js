@@ -159,6 +159,12 @@ function computePlayerSummary(group, personId) {
       else if (sum3 / 3 < me.average) add(notSoWell, 55, `Last 3 games: ${fmtSigned(sum3)}`, ', below own average');
     }
   }
+  // games as leader (only games where a leader was recorded)
+  const ledGames = games.map(g => gameLeader(g)).filter(l => l && l.personId === personId);
+  const led = ledGames.length, ledWon = ledGames.filter(l => l.result === 'won').length, ledLost = led - ledWon;
+  if (ledWon >= 1) add(wentWell, 45 + Math.round(40 * ledWon / led), `Won ${ledWon} of ${led}`, ` game${led === 1 ? '' : 's'} as leader`);
+  if (ledLost >= 1) add(notSoWell, 45 + Math.round(40 * ledLost / led), `Lost ${ledLost} of ${led}`, ` game${led === 1 ? '' : 's'} as leader`);
+
   if (satOut.length >= 1) {
     add(notSoWell, 30 + 5 * satOut.length, `Sat out ${satOut.length} game${satOut.length === 1 ? '' : 's'}`,
       satOut.length <= 3 ? ` (${satOut.map(g => '#' + g.gameId).join(', ')})` : '');
@@ -179,6 +185,9 @@ function computePlayerSummary(group, personId) {
     average: me.average,
     played: me.played,
     wins: myWins,
+    led,
+    ledWon,
+    ledLost,
     isLeader: rank === 1,
     series,
     peak,
@@ -270,6 +279,7 @@ function renderPlayerSummary(s) {
       <div class="ps-tile"><div class="v" data-stat="games">${s.played}</div><div class="l">Games</div></div>
       <div class="ps-tile"><div class="v" data-stat="wins">${s.wins}</div><div class="l">Wins</div></div>
     </div>
+    ${s.led ? `<div class="ps-led" data-stat="led">${LEADER_SVG}<span>Led <b>${s.led}</b> game${s.led === 1 ? '' : 's'} · won <b>${s.ledWon}</b> · lost <b>${s.ledLost}</b></span></div>` : ''}
     <div class="ps-card">
       <div class="ps-card-head"><span>Score after each game</span><span class="ps-range">${escapeHtml(range)}</span></div>
       ${summaryChartHtml(s)}
@@ -293,6 +303,7 @@ function buildSummaryText(s) {
   lines.push(`_Rank ${s.rank} of ${s.rankCount} · ${s.played} game${s.played === 1 ? '' : 's'}_`);
   lines.push('');
   lines.push(`Total: *${s.total}* · Average: *${s.played ? s.average.toFixed(2) : '-'}* · Wins: *${s.wins}*`);
+  if (s.led) lines.push(`Led: *${s.led}* · won *${s.ledWon}* · lost *${s.ledLost}*`);
   if (s.wentWell.length) { lines.push(''); lines.push('*Went well*'); s.wentWell.forEach(it => lines.push(`+ ${it.strong}${it.rest}`)); }
   if (s.notSoWell.length) { lines.push(''); lines.push('*Not so well*'); s.notSoWell.forEach(it => lines.push(`- ${it.strong}${it.rest}`)); }
   const url = typeof appUrl === 'function' ? appUrl() : '';

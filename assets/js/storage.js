@@ -4,6 +4,8 @@
 const STORAGE_KEY = 'points_game_v1';
 
 const BACKUP_KEY = STORAGE_KEY + '_backup';
+// copy of the data taken once, right before leaders were first added to old games
+const LEADER_BACKUP_KEY = STORAGE_KEY + '_backup_before_leaders';
 
 function loadState() {
   let raw = null;
@@ -149,6 +151,7 @@ function updatePerson(groupId, personId, patch) {
     }
     // keep history linked to the renamed player
     g.games.forEach(gm => gm.entries.forEach(e => { if (e.personId === personId) e.personId = newId; }));
+    g.games.forEach(gm => { if (gm.leader && gm.leader.personId === personId) gm.leader.personId = newId; });
   }
   Object.assign(p, patch, { personId: newId });
   saveState(state);
@@ -164,7 +167,9 @@ function removePerson(groupId, personId) {
 }
 
 /* games */
-function addGame(groupId, entries) {
+// leader (optional): null = no leader in this game, or { personId, result: 'won'|'lost', source }.
+// It is only a note of who led; points are stored exactly as given.
+function addGame(groupId, entries, leader) {
   const state = loadState();
   const g = state.groups.find(x => x.groupId === groupId);
   if (!g) throw new Error('Group not found');
@@ -173,6 +178,7 @@ function addGame(groupId, entries) {
     timestamp: new Date().toISOString(),
     entries // [{ personId, participated, points }]
   };
+  if (leader !== undefined) game.leader = leader;
   g.games.push(game);
   g.nextGameId++;
   saveState(state);
@@ -180,13 +186,15 @@ function addGame(groupId, entries) {
 }
 
 // Replace the entries of an existing game; its id and timestamp are kept.
-function updateGame(groupId, gameId, entries) {
+// leader: undefined leaves the game's leader as it is; null or an object replaces it.
+function updateGame(groupId, gameId, entries, leader) {
   const state = loadState();
   const g = state.groups.find(x => x.groupId === groupId);
   if (!g) throw new Error('Group not found');
   const game = g.games.find(x => Number(x.gameId) === Number(gameId));
   if (!game) throw new Error('Game not found');
   game.entries = entries;
+  if (leader !== undefined) game.leader = leader;
   game.editedAt = new Date().toISOString();
   saveState(state);
   return game;
@@ -211,6 +219,31 @@ function clearHistory(groupId) {
   g.games = [];
   g.nextGameId = 1;
   saveState(state);
+}
+
+// Record the leader of several old games at once: leaders = { gameId: null | { personId, result, source } }.
+// Works on the saved data as it is (no defaults filled in) so nothing but `leader` changes.
+// The first time, the data as it was is copied to LEADER_BACKUP_KEY (never overwritten later).
+function setGameLeaders(groupId, leaders) {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) throw new Error('No saved data');
+  const data = JSON.parse(raw);
+  const g = (data.groups || []).find(x => x.groupId === groupId);
+  if (!g) throw new Error('Group not found');
+  if (localStorage.getItem(LEADER_BACKUP_KEY) === null) localStorage.setItem(LEADER_BACKUP_KEY, raw);
+  let count = 0;
+  (g.games || []).forEach(gm => {
+    if (!Object.prototype.hasOwnProperty.call(leaders, String(gm.gameId))) return;
+    if (gm.leader !== undefined) return; // already reviewed (e.g. in another tab): keep it
+    const l = leaders[String(gm.gameId)];
+    if (l === null) gm.leader = null;
+    else if (l && (gm.entries || []).some(e => e.participated && e.personId === l.personId) && (l.result === 'won' || l.result === 'lost')) {
+      gm.leader = { personId: l.personId, result: l.result, source: l.source || 'auto' };
+    } else return;
+    count++;
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return count;
 }
 
 /* utility */
